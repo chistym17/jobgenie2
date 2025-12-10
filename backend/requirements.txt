@@ -1,0 +1,34 @@
+# Core API framework
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+
+
+# Data validation
+pydantic==2.6.4
+pydantic-settings==2.2.1    
+
+# Web scraping & crawling
+requests==2.31.0
+feedparser==6.0.10
+python-dateutil==2.8.2
+motor>=3.1,<4.0
+pymongo>=4.3,<5.0
+              
+
+# File & text processing
+python-multipart==0.0.9     
+pdfminer.six==20221105       
+python-docx==1.1.0          
+
+
+python-dotenv==1.0.1
+gunicorn==21.2.0
+
+markdownify
+passlib
+python-jose
+protobuf
+pydantic[email]
+
+google-genai
+PyPDF2
