@@ -1,26 +1,94 @@
 @import "tailwindcss";
+@import url('https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&f[]=general-sans@400,500,600&display=swap');
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Charcoal + Coral + Sand */
+  --brand-bg: #0f1115;
+  --brand-surface: #151a23;
+  --brand-card: #1a202c;
+  --brand-border: rgba(255, 255, 255, 0.08);
+  --brand-text: #f2f4f8;
+  --brand-muted: #b9c0cc;
+  --brand-primary: #ff6b6b;   /* coral red */
+  --brand-secondary: #f4d19b; /* warm sand */
+  --brand-ink: #0f1115;
+  --brand-glow: 0 0 40px -10px rgba(255, 107, 107, 0.3);
+  --btn-radius: 0.75rem;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-background: var(--brand-bg);
+  --color-foreground: var(--brand-text);
+  --font-sans: 'General Sans', var(--font-geist-sans), system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background: var(--brand-bg);
+  color: var(--brand-text);
+  font-family: 'General Sans', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Clash Display', 'General Sans', system-ui, -apple-system, sans-serif;
+}
+
+.noise-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--brand-border);
+}
+
+.accent-glow {
+  box-shadow: var(--brand-glow);
+}
+
+.text-brand-primary { color: var(--brand-primary); }
+.text-brand { color: var(--brand-text); }
+.text-brand-secondary { color: var(--brand-secondary); }
+.text-brand-muted { color: var(--brand-muted); }
+.bg-brand-primary { background-color: var(--brand-primary); }
+.bg-brand-secondary { background-color: var(--brand-secondary); }
+.bg-brand-card { background-color: var(--brand-card); }
+.bg-brand { background-color: var(--brand-bg); }
+.border-brand { border-color: var(--brand-border); }
+
+.bg-brand-primary-soft {
+  background-color: color-mix(in srgb, var(--brand-primary) 12%, transparent);
+}
+.border-brand-primary-soft {
+  border-color: color-mix(in srgb, var(--brand-primary) 22%, transparent);
+}
+.bg-brand-secondary-soft {
+  background-color: color-mix(in srgb, var(--brand-secondary) 12%, transparent);
+}
+
+.btn-primary {
+  background: var(--brand-primary);
+  color: var(--brand-ink);
+  border-radius: var(--btn-radius);
+}
+
+.btn-ghost {
+  border: 1px solid var(--brand-border);
+  color: var(--brand-text);
+  border-radius: var(--btn-radius);
+}
+
+.focus-outline {
+  outline: 2px solid var(--brand-secondary);
+  outline-offset: 2px;
 }
