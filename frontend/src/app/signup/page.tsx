@@ -46,7 +46,7 @@ export default function SignupPage() {
   };
 
   return (
-    <AuthShell title="Join Jobgeniw" subtitle="Create an account to get curated matches and guidance">
+    <AuthShell title="Join Jobgenie" subtitle="Create an account to get curated matches and guidance">
       <Toaster position="top-center" richColors />
       <form onSubmit={handleSubmit} className="space-y-5">
         <AuthInput

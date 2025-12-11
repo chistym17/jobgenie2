@@ -25,11 +25,6 @@ const Hero = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-brand-primary-soft bg-brand-primary-soft text-brand-primary text-xs font-medium tracking-wide mb-8">
-              <span className="w-2 h-2 rounded-full bg-brand-primary animate-pulse" />
-              AI-POWERED RECRUITING V2.0
-            </div>
-
             <h1 className="text-6xl md:text-8xl font-semibold leading-[0.9] tracking-tighter mb-8 text-white">
               Stop searching.<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[color:var(--brand-primary)] to-white/70">
@@ -72,15 +67,30 @@ const Hero = () => {
                 transition={{ delay: 0.2, duration: 0.8, ease: "easeOut" }}
                 className="absolute top-0 left-0 w-full bg-[#181B21] rounded-3xl border border-white/10 p-8 shadow-2xl accent-glow"
               >
-                <div className="flex justify-between items-center mb-8">
-                  <div className="w-12 h-12 rounded-full bg-gray-700/50" />
-                  <div className="h-2 w-20 bg-gray-700/50 rounded-full" />
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <p className="text-xs font-semibold text-brand-secondary uppercase tracking-wide">Featured match</p>
+                    <h3 className="text-2xl font-bold text-white mt-1">Senior Software Engineer (Backend)</h3>
+                    <p className="text-brand-muted text-sm">Aurora Labs · Remote (US)</p>
+                  </div>
+                  <div className="bg-brand-primary-soft text-brand-primary px-4 py-2 rounded-lg text-sm font-semibold">96% match</div>
                 </div>
 
-                <div className="space-y-4 mb-8">
-                  <div className="h-8 w-3/4 bg-white/10 rounded animate-pulse" />
-                  <div className="h-4 w-1/2 bg-white/5 rounded" />
-                  <div className="h-4 w-full bg-white/5 rounded" />
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <span className="text-xs bg-white/5 text-white px-3 py-1 rounded-full border border-white/10">Full-time</span>
+                  <span className="text-xs bg-white/5 text-white px-3 py-1 rounded-full border border-white/10">$165k–$195k</span>
+                  <span className="text-xs bg-white/5 text-white px-3 py-1 rounded-full border border-white/10">EST-friendly</span>
+                </div>
+
+                <div className="text-brand-muted text-sm leading-relaxed mb-4">
+                  Help build event-driven data pipelines and APIs that serve millions of users. You’ll own services from design to production and mentor teammates.
+                </div>
+
+                <div className="flex flex-wrap gap-2 mb-6">
+                  <span className="text-xs px-3 py-1 rounded-full border border-brand-primary-soft text-brand-primary bg-brand-primary-soft/40">TypeScript</span>
+                  <span className="text-xs px-3 py-1 rounded-full border border-brand-primary-soft text-brand-primary bg-brand-primary-soft/40">Node.js</span>
+                  <span className="text-xs px-3 py-1 rounded-full border border-white/10 text-white">Postgres</span>
+                  <span className="text-xs px-3 py-1 rounded-full border border-white/10 text-white">AWS</span>
                 </div>
 
                 <div className="p-4 bg-brand-primary-soft rounded-xl border border-brand-primary-soft flex items-center gap-4">
@@ -88,8 +98,8 @@ const Hero = () => {
                     <Zap size={20} fill="black" />
                   </div>
                   <div>
-                    <div className="text-brand-primary font-bold text-lg">98% Compatible</div>
-                    <div className="text-brand-primary text-xs opacity-70">Based on skills & culture</div>
+                    <div className="text-brand-primary font-bold text-lg">Great fit</div>
+                    <div className="text-brand-primary text-xs opacity-70">Your backend lead + cloud experience matches the stack</div>
                   </div>
                 </div>
               </motion.div>

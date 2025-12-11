@@ -15,7 +15,7 @@ const AuthShell = ({ title, subtitle, children }: AuthShellProps) => {
       <div className="w-full max-w-md relative">
         <div className="glass-panel rounded-2xl shadow-2xl border border-brand p-8 md:p-10">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-brand-primary-soft bg-brand-primary-soft text-brand-primary text-xs font-semibold uppercase tracking-wide">Jobgeniw</div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-brand-primary-soft bg-brand-primary-soft text-brand-primary text-xs font-semibold uppercase tracking-wide">Jobgenie</div>
             <h1 className="text-3xl md:text-4xl font-bold text-white mt-4">{title}</h1>
             {subtitle ? <p className="text-brand-muted mt-2 text-sm md:text-base">{subtitle}</p> : null}
           </div>

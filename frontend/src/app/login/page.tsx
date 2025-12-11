@@ -68,7 +68,7 @@ export default function LoginPage() {
   };
 
   return (
-    <AuthShell title="Welcome back" subtitle="Log in to continue your Jobgeniw journey">
+    <AuthShell title="Welcome back" subtitle="Log in to continue your Jobgenie journey">
       <Toaster position="top-center" richColors />
       <DemoBanner loading={demoLoading} onClick={handleDemoLogin} />
       <form onSubmit={handleSubmit} className="space-y-5">
