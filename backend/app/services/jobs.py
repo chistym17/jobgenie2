@@ -3,7 +3,7 @@ import feedparser
 import requests
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil import parser
 import hashlib
 import html
@@ -129,6 +129,24 @@ def save_to_mongodb(jobs: list):
         print(f"MongoDB connection failed: {e}")
     except Exception as e:
         print(f"MongoDB save failed: {e}")
+
+
+def delete_jobs_older_than(days: int = 7):
+    try:
+        client = MongoClient(os.getenv("MONGODB_URI"), serverSelectionTimeoutMS=5000)
+        db = client["jobs_db"]
+        collection = db["jobs"]
+
+        cutoff = datetime.now() - timedelta(days=days)
+        cutoff_str = cutoff.strftime('%Y-%m-%d')
+
+        result = collection.delete_many({
+            "date": {"$lt": cutoff_str}
+        })
+        print(f"Deleted {result.deleted_count} jobs older than {days} days (before {cutoff_str})")
+        client.close()
+    except Exception as e:
+        print(f"MongoDB deletion failed: {e}")
 
 def main():
     existing_urls = set()
