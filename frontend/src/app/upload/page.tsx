@@ -104,6 +104,10 @@ export default function ResumeUploadSection() {
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
+    const closeModal = () => {
+        setUploadSuccess(false);
+    };
+
     return (
         <div className="min-h-screen bg-brand text-brand relative overflow-hidden">
             <div className="noise-bg" aria-hidden="true" />
@@ -232,8 +236,18 @@ export default function ResumeUploadSection() {
                     </div>
 
                     {uploadSuccess && resumeData && (
-                        <div className="mt-10" ref={analysisRef}>
-                            <ResumeAnalysis data={resumeData} />
+                        <div
+                            ref={analysisRef}
+                            className="fixed inset-0 z-40 flex items-center justify-center px-4 sm:px-6"
+                            onClick={closeModal}
+                        >
+                            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+                            <div 
+                                className="relative z-10 max-w-2xl w-full"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <ResumeAnalysis data={resumeData} onClose={closeModal} />
+                            </div>
                         </div>
                     )}
                 </div>
