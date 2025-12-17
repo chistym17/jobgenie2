@@ -1,55 +1,49 @@
 from __future__ import annotations
 
 import os
-import pathlib
-import time
-from typing import BinaryIO
+from typing import Optional
 
+from bson import ObjectId
 from fastapi import UploadFile
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
 
 
 class FileStorageService:
-
-    def __init__(self, base_dir: str | None = None) -> None:
-        if base_dir is None:
-            backend_root = pathlib.Path(__file__).resolve().parents[3]
-            base_dir = backend_root / "uploads" / "resumes"
-        self.base_path = pathlib.Path(base_dir)
-        self.base_path.mkdir(parents=True, exist_ok=True)
-
-    def _build_path(self, user_email: str, filename: str) -> pathlib.Path:
-        safe_email = user_email.replace("@", "_at_").replace("/", "_")
-        timestamp = int(time.time() * 1000)
-        safe_name = os.path.basename(filename)
-        return self.base_path / safe_email / f"{timestamp}_{safe_name}"
+    def __init__(self, bucket_name: str = "resume_files") -> None:
+        mongo_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27018")
+        client = AsyncIOMotorClient(mongo_uri)
+        db = client.jobs_db
+        self.bucket = AsyncIOMotorGridFSBucket(db, bucket_name=bucket_name)
 
     async def save_file(self, uploaded_file: UploadFile, user_email: str) -> str:
-        target_path = self._build_path(user_email, uploaded_file.filename or "resume.pdf")
-        target_path.parent.mkdir(parents=True, exist_ok=True)
+        filename = uploaded_file.filename or "resume.pdf"
+        metadata = {"user_email": user_email}
 
-        with target_path.open("wb") as out_f:
-            while True:
-                chunk = await uploaded_file.read(1024 * 1024)
-                if not chunk:
-                    break
-                out_f.write(chunk)
+        file_id = await self.bucket.upload_from_stream(
+            filename,
+            uploaded_file.file,
+            metadata=metadata,
+        )
 
         await uploaded_file.seek(0)
 
-        return str(target_path)
+        return str(file_id)
 
-    def get_file(self, file_path: str) -> bytes:
-        path = pathlib.Path(file_path)
-        with path.open("rb") as f:
-            return f.read()
+    async def get_file(self, file_id: str) -> bytes:
+        oid = ObjectId(file_id)
+        stream = await self.bucket.open_download_stream(oid)
+        chunks: list[bytes] = []
+        while True:
+            data = await stream.read(1024 * 1024)
+            if not data:
+                break
+            chunks.append(data)
+        return b"".join(chunks)
 
-    def delete_file(self, file_path: str) -> bool:
+    async def delete_file(self, file_id: str) -> bool:
         try:
-            path = pathlib.Path(file_path)
-            if path.exists():
-                path.unlink()
+            oid = ObjectId(file_id)
+            await self.bucket.delete(oid)
             return True
         except Exception:
             return False
-
-
