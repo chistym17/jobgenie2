@@ -1,29 +1,12 @@
 'use client';
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Navbar from "../components/v2/Navbar";
 import { Upload, Clock, CheckCircle2, AlertTriangle, ArrowUpRight, Bell, Sparkles } from "lucide-react";
-
-const dummyUploads = [
-  {
-    id: "1",
-    fileName: "Senior Backend Engineer.pdf",
-    uploadedAt: "2025-12-15 10:21",
-    status: "completed",
-  },
-  {
-    id: "2",
-    fileName: "Product Manager Resume.pdf",
-    uploadedAt: "2025-12-16 14:09",
-    status: "parsing",
-  },
-  {
-    id: "3",
-    fileName: "Data Scientist CV.pdf",
-    uploadedAt: "2025-12-17 09:47",
-    status: "failed",
-  },
-];
+import { useSearchParams } from "next/navigation";
+import { useCurrentUser } from "../hooks/useCurrentUser";
+import { useUploadHistory } from "../hooks/useUploadHistory";
+import { useUploadStatus } from "../hooks/useUploadStatus";
 
 const statusConfig: Record<
   string,
@@ -49,6 +32,20 @@ const statusConfig: Record<
 
 export default function ResumeUploadsDashboard() {
   const [activeTab, setActiveTab] = useState<"history" | "new" | "recommendations" | "notifications">("history");
+  const searchParams = useSearchParams();
+  const focusedUploadId = searchParams.get("upload_id");
+  const { user } = useCurrentUser();
+  const userEmail = user?.email || null;
+  const { items: historyItems, isLoading: isHistoryLoading } = useUploadHistory(userEmail);
+  const { status: focusedStatus } = useUploadStatus(focusedUploadId, !!focusedUploadId);
+
+  const uploadsToShow = useMemo(() => {
+    if (!historyItems.length && !focusedUploadId) return [];
+    if (!focusedUploadId) return historyItems;
+    const existing = historyItems.find((x) => x.upload_id === focusedUploadId);
+    if (existing) return historyItems;
+    return historyItems;
+  }, [historyItems, focusedUploadId]);
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text relative overflow-hidden">
@@ -136,12 +133,21 @@ export default function ResumeUploadsDashboard() {
                   </div>
 
                   <div className="border-t border-white/10 mt-4 pt-3 space-y-2.5">
-                    {dummyUploads.map((upload) => {
+                    {isHistoryLoading && (
+                      <div className="py-10 text-center text-sm text-brand-muted">
+                        Loading your uploads...
+                      </div>
+                    )}
+
+                    {!isHistoryLoading && uploadsToShow.map((upload) => {
                       const cfg = statusConfig[upload.status] || statusConfig.parsing;
+                      const isFocused = focusedUploadId === upload.upload_id;
                       return (
                         <div
-                          key={upload.id}
-                          className="flex items-center justify-between gap-3 rounded-2xl px-3 py-3 sm:px-4 sm:py-3.5 hover:bg-white/[0.03] transition-colors"
+                          key={upload.upload_id}
+                          className={`flex items-center justify-between gap-3 rounded-2xl px-3 py-3 sm:px-4 sm:py-3.5 hover:bg-white/[0.03] transition-colors ${
+                            isFocused ? "border border-brand-primary-soft bg-brand-primary-soft/10" : ""
+                          }`}
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="h-8 w-8 rounded-full bg-brand-primary-soft flex items-center justify-center flex-shrink-0">
@@ -149,10 +155,10 @@ export default function ResumeUploadsDashboard() {
                             </div>
                             <div className="min-w-0">
                               <p className="text-sm sm:text-base text-white truncate">
-                                {upload.fileName}
+                                {upload.file_name}
                               </p>
                               <p className="text-xs text-brand-muted">
-                                Uploaded {upload.uploadedAt}
+                                Uploaded {upload.created_at || ""}
                               </p>
                             </div>
                           </div>
@@ -173,7 +179,7 @@ export default function ResumeUploadsDashboard() {
                       );
                     })}
 
-                    {dummyUploads.length === 0 && (
+                    {!isHistoryLoading && uploadsToShow.length === 0 && (
                       <div className="py-10 text-center text-sm text-brand-muted">
                         No uploads yet. Start by uploading your first resume.
                       </div>
@@ -262,10 +268,14 @@ export default function ResumeUploadsDashboard() {
                     </div>
                     <div>
                       <p className="text-sm text-white">
-                        One resume is being processed
+                        {focusedUploadId
+                          ? "Latest upload is being tracked"
+                          : "No active upload selected"}
                       </p>
                       <p className="text-xs text-brand-muted">
-                        This will update automatically once parsing is complete.
+                        {focusedUploadId
+                          ? focusedStatus || "Fetching status..."
+                          : "Upload a resume to see live progress here."}
                       </p>
                     </div>
                   </div>

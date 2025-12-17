@@ -1,36 +1,25 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import { Upload, FileText, Check, X, Loader2, Sparkles, Target, Zap } from "lucide-react";
+import { Upload, FileText, X, Loader2, Sparkles, Target, Zap } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import Navbar from "../components/v2/Navbar";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { useRouter } from "next/navigation";
-import ResumeAnalysis from "../components/ResumeAnalysis";
-import { startRecommendationTask } from "../utils/startrecommendationtask";
+import { useResumeUploadV2 } from "../hooks/useResumeUploadV2";
 
 export default function ResumeUploadSection() {
     const router = useRouter();
     const [file, setFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
-    const [uploadSuccess, setUploadSuccess] = useState(false);
-    const [resumeData, setResumeData] = useState<any>(null);
-    const [uploadId, setUploadId] = useState<string | null>(null);
-    const [uploadStatus, setUploadStatus] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const analysisRef = useRef<HTMLDivElement>(null);
     const { user, loading } = useCurrentUser();
     const userEmail = user?.email || "";
+    const { isUploading, uploadResume } = useResumeUploadV2();
 
     useEffect(() => {
         if (loading) return;
         if (!user) router.push('/login');
     }, [user, router, loading]);
-
-    useEffect(() => {
-        if (uploadSuccess && resumeData && analysisRef.current) {
-            analysisRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    }, [uploadSuccess, resumeData]);
 
     const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -51,9 +40,6 @@ export default function ResumeUploadSection() {
         }
     };
 
-    const backendV2Base =
-        (process.env.NEXT_PUBLIC_BACKEND_URL || "").replace("/api/v1", "/api/v2");
-
     const validateAndSetFile = (file: File) => {
         const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
         if (!validTypes.includes(file.type)) {
@@ -65,47 +51,6 @@ export default function ResumeUploadSection() {
             return;
         }
         setFile(file);
-        setUploadSuccess(false);
-        setUploadId(null);
-        setUploadStatus(null);
-    };
-
-    const pollUploadStatus = async (id: string, attempt = 0) => {
-        try {
-            const res = await fetch(`${backendV2Base}/resume/upload/${id}/status`);
-            if (!res.ok) {
-                throw new Error("Failed to fetch upload status");
-            }
-            const data = await res.json();
-            const status = data.status as string;
-            setUploadStatus(status);
-
-            if (status === "parsed" || status === "completed") {
-                setUploadSuccess(true);
-                toast.success("Resume processed successfully");
-                if (userEmail) {
-                    try {
-                        await startRecommendationTask(userEmail);
-                    } catch (err) {
-                        console.error("Error starting recommendation task", err);
-                    }
-                }
-                return;
-            }
-
-            if (status === "failed" || status === "parsing_failed") {
-                toast.error("Resume processing failed. You can retry later.");
-                return;
-            }
-
-            if (attempt < 150) {
-                setTimeout(() => {
-                    pollUploadStatus(id, attempt + 1);
-                }, 2000);
-            }
-        } catch (err) {
-            console.error("Error polling upload status", err);
-        }
     };
 
     const handleUpload = async () => {
@@ -117,23 +62,11 @@ export default function ResumeUploadSection() {
             return;
         }
 
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("user_email", userEmail);
-
         const analyzingToastId = toast.loading("Uploading your resume...");
         try {
-            const response = await fetch(`${backendV2Base}/resume/upload`, {
-                method: "POST",
-                body: formData,
-            });
-            if (!response.ok) throw new Error("Upload failed");
-            
-            const data = await response.json();
-            setUploadId(data.upload_id);
-            setUploadStatus(data.status);
+            const data = await uploadResume(file, userEmail);
             toast.success("Resume upload queued for processing", { id: analyzingToastId });
-            pollUploadStatus(data.upload_id);
+            router.push(`/uploads?upload_id=${data.upload_id}`);
         } catch (error) {
             toast.error("Failed to upload resume. Please try again.", { id: analyzingToastId });
         } finally {
@@ -144,12 +77,7 @@ export default function ResumeUploadSection() {
     const triggerFileInput = () => fileInputRef.current?.click();
     const removeFile = () => {
         setFile(null);
-        setUploadSuccess(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-
-    const closeModal = () => {
-        setUploadSuccess(false);
     };
 
     return (
@@ -248,27 +176,22 @@ export default function ResumeUploadSection() {
                                         </button>
                                     </div>
 
-                                    {!uploadSuccess ? (
-                                        <button
-                                            onClick={handleUpload}
-                                            disabled={uploading}
-                                            className={`mt-auto w-full btn-primary py-4 rounded-lg flex items-center justify-center gap-2 font-medium ${uploading ? 'opacity-70 cursor-not-allowed' : ''}`}
-                                        >
-                                            {uploading ? (
-                                                <>
-                                                    <Loader2 className="animate-spin h-5 w-5" />
-                                                    Uploading...
-                                                </>
-                                            ) : (
-                                                <>Upload Resume</>
-                                            )}
-                                        </button>
-                                    ) : (
-                                        <div className="mt-auto bg-brand-secondary-soft text-brand-secondary p-4 rounded-lg flex items-center gap-3">
-                                            <Check className="h-6 w-6" />
-                                            <span>Resume uploaded successfully! We're analyzing your profile.</span>
-                                        </div>
-                                    )}
+                                    <button
+                                        onClick={handleUpload}
+                                        disabled={uploading || isUploading}
+                                        className={`mt-auto w-full btn-primary py-4 rounded-lg flex items-center justify-center gap-2 font-medium ${
+                                            uploading || isUploading ? 'opacity-70 cursor-not-allowed' : ''
+                                        }`}
+                                    >
+                                        {uploading || isUploading ? (
+                                            <>
+                                                <Loader2 className="animate-spin h-5 w-5" />
+                                                Uploading...
+                                            </>
+                                        ) : (
+                                            <>Upload Resume</>
+                                        )}
+                                    </button>
                                 </div>
                             )}
 
@@ -276,31 +199,8 @@ export default function ResumeUploadSection() {
                                 <p>Your resume data is secure and will only be used to provide you with job recommendations.</p>
                                 <p className="mt-2">By uploading, you agree to our <a href="#" className="text-brand-primary hover:opacity-80">Terms of Service</a> and <a href="#" className="text-brand-primary hover:opacity-80">Privacy Policy</a>.</p>
                             </div>
-
-                            {uploadId && (
-                                <div className="mt-4 text-xs text-brand-muted text-center">
-                                    <p>Upload ID: {uploadId}</p>
-                                    {uploadStatus && <p>Status: {uploadStatus}</p>}
-                                </div>
-                            )}
                         </div>
                     </div>
-
-                    {uploadSuccess && resumeData && (
-                        <div
-                            ref={analysisRef}
-                            className="fixed inset-0 z-40 flex items-center justify-center px-4 sm:px-6"
-                            onClick={closeModal}
-                        >
-                            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-                            <div 
-                                className="relative z-10 max-w-2xl w-full"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <ResumeAnalysis data={resumeData} onClose={closeModal} />
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
         </div>
