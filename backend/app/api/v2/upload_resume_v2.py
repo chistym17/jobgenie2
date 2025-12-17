@@ -41,6 +41,10 @@ async def upload_resume_v2(
     )
     logger.info("Created ResumeUpload record: upload_id=%s", upload_id)
 
+    if not upload_id:
+        logger.error("create_upload returned empty upload_id for user=%s file_id=%s", user_email, file_id)
+        raise HTTPException(status_code=500, detail="Failed to create upload record")
+
     # enqueue parse_resume_v2 task in worker
     task = celery_client.send_task(
         "parse_resume_v2",

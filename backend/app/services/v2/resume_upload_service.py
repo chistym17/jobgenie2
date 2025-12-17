@@ -10,10 +10,12 @@ from app.models.v2.upload_db_models import (
     RESUME_UPLOADS_COLLECTION,
     ResumeUpload,
 )
+from app.utils.logger_v2 import get_v2_logger
 
 
 def _get_mongo_client() -> AsyncIOMotorClient:
     import os
+
     mongo_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27018")
     return AsyncIOMotorClient(mongo_uri)
 
@@ -21,6 +23,7 @@ def _get_mongo_client() -> AsyncIOMotorClient:
 _client: AsyncIOMotorClient = _get_mongo_client()
 _db = _client.jobs_db
 _collection: AsyncIOMotorCollection = _db[RESUME_UPLOADS_COLLECTION]
+_logger = get_v2_logger("resume_v2.service.uploads")
 
 
 async def create_upload(
@@ -35,9 +38,23 @@ async def create_upload(
         file_size=file_size,
         file_path=file_path,
     )
-    doc = upload.model_dump(by_alias=True)
+    doc = upload.model_dump(by_alias=True, exclude_none=True)
+    if "_id" in doc:
+        doc.pop("_id", None)
+    _logger.info(
+        "Creating ResumeUpload for user=%s file_name=%s file_size=%s",
+        user_email,
+        file_name,
+        file_size,
+    )
     result = await _collection.insert_one(doc)
-    return str(result.inserted_id)
+    inserted_id = result.inserted_id
+    if not inserted_id:
+        _logger.error("Insert into %s returned no inserted_id", RESUME_UPLOADS_COLLECTION)
+        raise RuntimeError("Failed to create upload record")
+    upload_id = str(inserted_id)
+    _logger.info("Created ResumeUpload with _id=%s", upload_id)
+    return upload_id
 
 
 async def update_status(
@@ -69,10 +86,22 @@ async def update_status(
     if "retry_count" in extra_fields and extra_fields["retry_count"] is not None:
         update["retry_count"] = int(extra_fields["retry_count"])
 
+    try:
+        oid = ObjectId(upload_id)
+    except Exception as exc:
+        _logger.error("Invalid upload_id passed to update_status: %s err=%s", upload_id, exc)
+        raise
+
     result = await _collection.update_one(
-        {"_id": ObjectId(upload_id)},
+        {"_id": oid},
         {"$set": update},
     )
+    if result.matched_count != 1:
+        _logger.warning(
+            "update_status did not match any document upload_id=%s matched=%s",
+            upload_id,
+            result.matched_count,
+        )
     return result.matched_count == 1
 
 

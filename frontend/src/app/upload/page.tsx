@@ -6,7 +6,7 @@ import Navbar from "../components/v2/Navbar";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { useRouter } from "next/navigation";
 import ResumeAnalysis from "../components/ResumeAnalysis";
-import { pullEmbedderTask } from "../utils/startEmbedderTask";
+import { startRecommendationTask } from "../utils/startrecommendationtask";
 
 export default function ResumeUploadSection() {
     const router = useRouter();
@@ -14,6 +14,8 @@ export default function ResumeUploadSection() {
     const [uploading, setUploading] = useState(false);
     const [uploadSuccess, setUploadSuccess] = useState(false);
     const [resumeData, setResumeData] = useState<any>(null);
+    const [uploadId, setUploadId] = useState<string | null>(null);
+    const [uploadStatus, setUploadStatus] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const analysisRef = useRef<HTMLDivElement>(null);
     const { user, loading } = useCurrentUser();
@@ -49,6 +51,9 @@ export default function ResumeUploadSection() {
         }
     };
 
+    const backendV2Base =
+        (process.env.NEXT_PUBLIC_BACKEND_URL || "").replace("/api/v1", "/api/v2");
+
     const validateAndSetFile = (file: File) => {
         const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
         if (!validTypes.includes(file.type)) {
@@ -61,6 +66,46 @@ export default function ResumeUploadSection() {
         }
         setFile(file);
         setUploadSuccess(false);
+        setUploadId(null);
+        setUploadStatus(null);
+    };
+
+    const pollUploadStatus = async (id: string, attempt = 0) => {
+        try {
+            const res = await fetch(`${backendV2Base}/resume/upload/${id}/status`);
+            if (!res.ok) {
+                throw new Error("Failed to fetch upload status");
+            }
+            const data = await res.json();
+            const status = data.status as string;
+            setUploadStatus(status);
+
+            if (status === "parsed" || status === "completed") {
+                setUploadSuccess(true);
+                toast.success("Resume processed successfully");
+                if (userEmail) {
+                    try {
+                        await startRecommendationTask(userEmail);
+                    } catch (err) {
+                        console.error("Error starting recommendation task", err);
+                    }
+                }
+                return;
+            }
+
+            if (status === "failed" || status === "parsing_failed") {
+                toast.error("Resume processing failed. You can retry later.");
+                return;
+            }
+
+            if (attempt < 150) {
+                setTimeout(() => {
+                    pollUploadStatus(id, attempt + 1);
+                }, 2000);
+            }
+        } catch (err) {
+            console.error("Error polling upload status", err);
+        }
     };
 
     const handleUpload = async () => {
@@ -76,22 +121,21 @@ export default function ResumeUploadSection() {
         formData.append("file", file);
         formData.append("user_email", userEmail);
 
-        const analyzingToastId = toast.loading("Analyzing your resume...");
+        const analyzingToastId = toast.loading("Uploading your resume...");
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/resume/upload`, {
+            const response = await fetch(`${backendV2Base}/resume/upload`, {
                 method: "POST",
                 body: formData,
             });
             if (!response.ok) throw new Error("Upload failed");
             
             const data = await response.json();
-            const task_id = data.task_id;
-            await pullEmbedderTask(task_id, userEmail);
-            setResumeData(data.resume);
-            setUploadSuccess(true);
-            toast.success("Resume uploaded and analyzed successfully!", { id: analyzingToastId });
+            setUploadId(data.upload_id);
+            setUploadStatus(data.status);
+            toast.success("Resume upload queued for processing", { id: analyzingToastId });
+            pollUploadStatus(data.upload_id);
         } catch (error) {
-            toast.error("Failed to upload/analyze resume. Please try again.", { id: analyzingToastId });
+            toast.error("Failed to upload resume. Please try again.", { id: analyzingToastId });
         } finally {
             setUploading(false);
         }
@@ -232,6 +276,13 @@ export default function ResumeUploadSection() {
                                 <p>Your resume data is secure and will only be used to provide you with job recommendations.</p>
                                 <p className="mt-2">By uploading, you agree to our <a href="#" className="text-brand-primary hover:opacity-80">Terms of Service</a> and <a href="#" className="text-brand-primary hover:opacity-80">Privacy Policy</a>.</p>
                             </div>
+
+                            {uploadId && (
+                                <div className="mt-4 text-xs text-brand-muted text-center">
+                                    <p>Upload ID: {uploadId}</p>
+                                    {uploadStatus && <p>Status: {uploadStatus}</p>}
+                                </div>
+                            )}
                         </div>
                     </div>
 

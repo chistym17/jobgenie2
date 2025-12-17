@@ -32,3 +32,5 @@ pydantic[email]
 
 google-genai
 PyPDF2
+celery
+redis
