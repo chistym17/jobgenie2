@@ -5,10 +5,12 @@ from crewai import LLM
 
 load_dotenv()
 
+model_name = os.getenv("GEMINI_MODEL_NAME", "gemini/gemini-2.0-flash")
+
 gemini_llm = LLM(
-    model="gemini/gemini-2.0-flash",
-    provider="google_ai",  
+    model=model_name,
+    provider="google_ai",
     api_key=os.getenv("GOOGLE_API_KEY"),
-    verbose=True, 
-    model_kwargs={"temperature": 0.5} 
+    verbose=True,
+    model_kwargs={"temperature": 0.5}
 )
