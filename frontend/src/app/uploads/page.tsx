@@ -18,12 +18,38 @@ const statusConfig: Record<
       "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40",
     icon: <CheckCircle2 className="h-3.5 w-3.5" />,
   },
+  parsed: {
+    label: "Ready",
+    className:
+      "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40",
+    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+  },
   parsing: {
     label: "Processing",
     className: "bg-amber-500/10 text-amber-300 border border-amber-500/40",
     icon: <Clock className="h-3.5 w-3.5" />,
   },
+  pending: {
+    label: "Queued",
+    className: "bg-amber-500/10 text-amber-300 border border-amber-500/40",
+    icon: <Clock className="h-3.5 w-3.5" />,
+  },
+  queued: {
+    label: "Queued",
+    className: "bg-amber-500/10 text-amber-300 border border-amber-500/40",
+    icon: <Clock className="h-3.5 w-3.5" />,
+  },
+  embedding: {
+    label: "Embedding",
+    className: "bg-amber-500/10 text-amber-300 border border-amber-500/40",
+    icon: <Clock className="h-3.5 w-3.5" />,
+  },
   failed: {
+    label: "Failed",
+    className: "bg-red-500/10 text-red-300 border border-red-500/40",
+    icon: <AlertTriangle className="h-3.5 w-3.5" />,
+  },
+  parsing_failed: {
     label: "Failed",
     className: "bg-red-500/10 text-red-300 border border-red-500/40",
     icon: <AlertTriangle className="h-3.5 w-3.5" />,
@@ -115,7 +141,7 @@ export default function ResumeUploadsDashboard() {
           </div>
 
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            <div className="lg:col-span-2 glass-panel rounded-3xl border border-white/10 p-5 sm:p-6 md:p-7 min-h-[380px]">
+            <div className="lg:col-span-2 glass-panel rounded-3xl border border-white/10 p-5 sm:p-6 md:p-7 min-h-[420px]">
               {activeTab === "history" && (
                 <>
                   <div className="flex items-center justify-between mb-4">
@@ -140,8 +166,11 @@ export default function ResumeUploadsDashboard() {
                     )}
 
                     {!isHistoryLoading && uploadsToShow.map((upload) => {
-                      const cfg = statusConfig[upload.status] || statusConfig.parsing;
                       const isFocused = focusedUploadId === upload.upload_id;
+                      const effectiveStatus =
+                        isFocused && focusedStatus ? focusedStatus : upload.status;
+                      const cfg =
+                        statusConfig[effectiveStatus] || statusConfig.parsing;
                       return (
                         <div
                           key={upload.upload_id}
@@ -158,7 +187,7 @@ export default function ResumeUploadsDashboard() {
                                 {upload.file_name}
                               </p>
                               <p className="text-xs text-brand-muted">
-                                Uploaded {upload.created_at || ""}
+                                Uploaded {(upload.created_at || "").slice(0, 10)}
                               </p>
                             </div>
                           </div>
@@ -251,9 +280,9 @@ export default function ResumeUploadsDashboard() {
             </div>
 
             <aside className="space-y-4">
-              <div className="glass-panel rounded-3xl border border-white/10 p-5 sm:p-6">
+              <div className="glass-panel rounded-3xl border border-white/10 p-5 sm:p-6 min-h-[220px] flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-medium text-white">
+                  <h3 className="text-base font-medium text-white">
                     Current activity
                   </h3>
                   <span className="text-[11px] uppercase tracking-wide text-brand-muted">
@@ -267,12 +296,20 @@ export default function ResumeUploadsDashboard() {
                       <Clock className="h-4 w-4 text-brand-primary" />
                     </div>
                     <div>
-                      <p className="text-sm text-white">
+                      <p className="text-base text-white">
                         {focusedUploadId
                           ? "Latest upload is being tracked"
                           : "No active upload selected"}
                       </p>
-                      <p className="text-xs text-brand-muted">
+                      <p
+                        className={`text-sm ${
+                          focusedStatus === "parsed" || focusedStatus === "completed"
+                            ? "text-emerald-300"
+                            : focusedStatus === "failed" || focusedStatus === "parsing_failed"
+                            ? "text-red-300"
+                            : "text-brand-muted"
+                        }`}
+                      >
                         {focusedUploadId
                           ? focusedStatus || "Fetching status..."
                           : "Upload a resume to see live progress here."}
