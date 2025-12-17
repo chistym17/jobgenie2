@@ -2,11 +2,12 @@
 
 import React, { useMemo, useState } from "react";
 import Navbar from "../components/v2/Navbar";
-import { Upload, Clock, CheckCircle2, AlertTriangle, ArrowUpRight, Bell, Sparkles } from "lucide-react";
+import { Upload, Clock, CheckCircle2, AlertTriangle, ArrowUpRight, Bell, Sparkles, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { useUploadHistory } from "../hooks/useUploadHistory";
 import { useUploadStatus } from "../hooks/useUploadStatus";
+import { useResumeDetail } from "../hooks/useResumeDetail";
 
 const statusConfig: Record<
   string,
@@ -64,6 +65,8 @@ export default function ResumeUploadsDashboard() {
   const userEmail = user?.email || null;
   const { items: historyItems, isLoading: isHistoryLoading } = useUploadHistory(userEmail);
   const { status: focusedStatus } = useUploadStatus(focusedUploadId, !!focusedUploadId);
+  const [detailUploadId, setDetailUploadId] = useState<string | null>(null);
+  const { data: detail, isLoading: isDetailLoading } = useResumeDetail(detailUploadId);
 
   const uploadsToShow = useMemo(() => {
     if (!historyItems.length && !focusedUploadId) return [];
@@ -199,8 +202,11 @@ export default function ResumeUploadsDashboard() {
                               {cfg.icon}
                               <span>{cfg.label}</span>
                             </span>
-                            <button className="hidden sm:inline-flex items-center gap-1.5 text-xs text-brand-muted hover:text-brand-primary transition-colors">
-                              Open
+                            <button
+                              onClick={() => setDetailUploadId(upload.upload_id)}
+                              className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border border-white/10 text-brand-muted hover:text-brand-ink hover:bg-brand-primary transition-colors"
+                            >
+                              View
                               <ArrowUpRight className="h-3.5 w-3.5" />
                             </button>
                           </div>
@@ -346,10 +352,97 @@ export default function ResumeUploadsDashboard() {
               </div>
             </aside>
           </section>
+
+          {detailUploadId && detail && (
+            <div className="fixed inset-0 z-40 flex items-center justify-center px-4 sm:px-6" onClick={() => setDetailUploadId(null)}>
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+              <div
+                className="relative z-10 max-w-3xl w-full max-h-[80vh] bg-black/80 rounded-3xl border border-white/20 p-6 sm:p-8 overflow-hidden flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-brand-muted mb-1">
+                      Parsed resume
+                    </p>
+                    <h3 className="text-xl sm:text-2xl font-semibold text-white">
+                      {detail.name || "Unnamed candidate"}
+                    </h3>
+                    {detail.contact?.email && (
+                      <p className="text-xs sm:text-sm text-brand-muted mt-1">
+                        {detail.contact.email}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setDetailUploadId(null)}
+                    className="text-brand-muted hover:text-white rounded-full p-1"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {detail.skills && detail.skills.length > 0 && (
+                  <div className="mb-5">
+                    <p className="text-xs uppercase tracking-wide text-brand-muted mb-2">
+                      Key skills
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {detail.skills.slice(0, 10).map((skill, idx) => (
+                        <span
+                          key={idx}
+                          className="bg-brand-primary-soft text-brand-primary px-3 py-1 rounded-full text-xs border border-brand-primary-soft"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {detail.experience && detail.experience.length > 0 && (
+                  <div className="space-y-3 mt-2 overflow-y-auto pr-1 thin-scroll">
+                    <p className="text-xs uppercase tracking-wide text-brand-muted">
+                      Experience
+                    </p>
+                    {detail.experience.map((exp, idx) => (
+                      <div
+                        key={idx}
+                        className="border border-white/10 rounded-2xl p-3.5 bg-white/[0.02]"
+                      >
+                        <p className="text-sm text-white">
+                          {exp.position || "Role"}{" "}
+                          {exp.company && (
+                            <span className="text-brand-muted">· {exp.company}</span>
+                          )}
+                        </p>
+                        {exp.duration && (
+                          <p className="text-xs text-brand-muted mt-0.5">
+                            {exp.duration}
+                          </p>
+                        )}
+                        {exp.description && (
+                          <p className="text-xs text-brand-muted mt-1.5">
+                            {exp.description}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {(!detail.skills || detail.skills.length === 0) &&
+                  (!detail.experience || detail.experience.length === 0) && (
+                    <p className="text-sm text-brand-muted mt-4">
+                      Parsed data is not available yet for this resume.
+                    </p>
+                  )}
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>
   );
 }
-
 
