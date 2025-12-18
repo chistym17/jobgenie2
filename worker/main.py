@@ -1,9 +1,9 @@
 from fastapi import FastAPI, WebSocket, Request, HTTPException
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import json
-from services.recommendation_service import RecommendationService
+from services.explainer_service import ExplainerService
+from services.resume_advisor_service import ResumeAdvisorService
 from db import fetch_resume_data
 import datetime
 from db import check_mongodb_connection
@@ -131,7 +131,7 @@ async def chat_websocket(websocket: WebSocket):
                         if not user_resume:
                             reply = f"[ERROR] Resume not found for {email}."
                         else:
-                            service = RecommendationService()
+                            service = ExplainerService()
                             explanation = service.explain_job_match(job_obj, user_resume)
                             reply = explanation
                 elif msg_type == "suggest":
@@ -144,7 +144,7 @@ async def chat_websocket(websocket: WebSocket):
                         if not user_resume:
                             reply = f"[ERROR] Resume not found for {email}."
                         else:
-                            service = RecommendationService()
+                            service = ResumeAdvisorService()
                             advice = service.provide_resume_advice(job_obj, user_resume)
                             reply = advice
                 else:

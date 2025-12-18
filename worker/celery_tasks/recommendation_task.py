@@ -1,5 +1,5 @@
 from celery_app import celery_app
-from services.recommendation_service import RecommendationService
+from services.recommender_service import RecommenderService
 from utils.upload_status import update_upload_status
 from utils.logger_v2 import get_v2_logger
 
@@ -13,7 +13,7 @@ def generate_recommendations_task(user_email: str, upload_id: str | None = None)
             update_upload_status(upload_id, "recommendations")
             logger.info("Recommendations started for upload_id=%s user_email=%s", upload_id, user_email)
         
-        service = RecommendationService()
+        service = RecommenderService()
         recommendations = service.generate_recommendations(user_email)
         
         if upload_id:
