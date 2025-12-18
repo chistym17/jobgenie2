@@ -67,6 +67,23 @@ def fetch_recommendations(user_email: str):
     if not embedding:
         print("No embedding available for recommendations")
         return []
-    fetched_chunks = search_similar(embedding)
-    return fetched_chunks
+    fetched_results = search_similar(embedding, top_k=20)
+    
+    job_data_with_ids = []
+    for result in fetched_results:
+        payload = result.payload if hasattr(result, 'payload') else {}
+        job_id = payload.get('job_id', '')
+        job_text = payload.get('content', '') or payload.get('title', '')
+        
+        if job_id and job_text:
+            job_data_with_ids.append({
+                'job_id': job_id,
+                'text': job_text,
+                'title': payload.get('title', ''),
+                'url': payload.get('url', ''),
+                'company': payload.get('company', ''),
+                'date': payload.get('date', '')
+            })
+    
+    return job_data_with_ids
 

@@ -64,13 +64,12 @@ class RecommenderService(BaseGeminiService):
             raise ValueError(f"Failed to parse JSON: {e.msg} at position {e.pos}")
 
     def generate_recommendations(self, user_email: str) -> list:
-        job_chunks = fetch_recommendations(user_email)
+        job_data_list = fetch_recommendations(user_email)
         
-        if not job_chunks:
+        if not job_data_list:
             return []
         
-        jobs_text = "\n\n".join([str(chunk) for chunk in job_chunks[:20]])
-        prompt = get_recommendation_prompt(jobs_text)
+        prompt = get_recommendation_prompt(job_data_list[:20])
 
         try:
             response = self.genai_client.models.generate_content(

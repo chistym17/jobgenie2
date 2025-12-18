@@ -44,6 +44,7 @@ class ResumeUpload(BaseModel):
     parse_task_id: Optional[str] = None
     embedding_task_id: Optional[str] = None
     recommendation_task_id: Optional[str] = None
+    recommendation_id: Optional[ObjectId] = None
 
     error_message: Optional[str] = None
     retry_count: int = 0

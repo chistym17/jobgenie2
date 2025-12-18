@@ -1,10 +1,19 @@
-def get_recommendation_prompt(jobs_text: str) -> str:
+def get_recommendation_prompt(jobs_data: list) -> str:
+    jobs_text_parts = []
+    for job_data in jobs_data:
+        job_id = job_data.get('job_id', '')
+        job_text = job_data.get('text', '')
+        jobs_text_parts.append(f"Job ID: {job_id}\n{job_text}")
+    
+    jobs_text = "\n\n---\n\n".join(jobs_text_parts)
+    
     return f"""You are a job recommendation formatter. Transform the following job listings into a structured JSON array.
 
 Job Listings:
 {jobs_text}
 
 Transform each job into a JSON object with these fields:
+- Job ID (REQUIRED - preserve the exact Job ID from the source)
 - Job Title
 - Company Name
 - Location
@@ -24,13 +33,15 @@ CRITICAL JSON FORMATTING RULES:
 1. Return ONLY a valid JSON array - no markdown, no explanations, no text before or after
 2. All string values MUST be properly escaped - use \\" for quotes inside strings
 3. The Match Score must be a number (0-100), not a string
-4. Ensure all commas are properly placed between array elements and object properties
-5. Do not include trailing commas
-6. All special characters in strings must be escaped (newlines as \\n, quotes as \\")
+4. The Job ID MUST be preserved exactly as provided in the source
+5. Ensure all commas are properly placed between array elements and object properties
+6. Do not include trailing commas
+7. All special characters in strings must be escaped (newlines as \\n, quotes as \\")
 
 Return ONLY the JSON array, nothing else. Example format:
 [
   {{
+    "Job ID": "2c37c2a269066c4bbc573e28f3260ce4",
     "Job Title": "Software Engineer",
     "Company Name": "Tech Corp",
     "Location": "San Francisco, CA",
