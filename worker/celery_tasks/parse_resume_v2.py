@@ -13,6 +13,7 @@ from google import genai
 from gridfs import GridFSBucket
 import PyPDF2
 
+from celery_tasks.precompute_embedding import precompute_resume_embedding_task
 from utils.logger_v2 import get_v2_logger
 
 
@@ -144,6 +145,25 @@ def parse_resume_v2(self, upload_id: str, file_id: str, user_email: str):
     )
 
     logger.info("parse_resume_v2 success upload_id=%s resume_id=%s", upload_id, resume_id)
+
+    embed_task = precompute_resume_embedding_task.delay(user_email, upload_id)
+    logger.info(
+      "Triggered precompute_resume_embedding_task for upload_id=%s task_id=%s user_email=%s",
+      upload_id,
+      embed_task.id,
+      user_email,
+    )
+    uploads.update_one(
+      {"_id": ObjectId(upload_id)},
+      {
+        "$set": {
+          "embedding_task_id": embed_task.id,
+          "status": "embedding",
+          "updated_at": datetime.utcnow(),
+        }
+      },
+    )
+
     return {"status": "parsed", "upload_id": upload_id, "resume_id": str(resume_id)}
 
   except Exception as exc:
