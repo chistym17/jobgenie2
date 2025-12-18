@@ -1,41 +1,25 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import { Upload, FilePlus, Check, X, FileText, Loader2, Link } from "lucide-react";
+import { Upload, FileText, X, Loader2, Sparkles, Target, Zap } from "lucide-react";
 import { Toaster, toast } from "sonner";
-import Navbar from "../components/Navbar";
+import Navbar from "../components/v2/Navbar";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { useRouter } from "next/navigation";
-import ResumeAnalysis from "../components/ResumeAnalysis";
-import { pullEmbedderTask} from "../utils/startEmbedderTask";
+import { useResumeUploadV2 } from "../hooks/useResumeUploadV2";
 
 export default function ResumeUploadSection() {
     const router = useRouter();
     const [file, setFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
-    const [uploadSuccess, setUploadSuccess] = useState(false);
-    const [resumeData, setResumeData] = useState<any>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const analysisRef = useRef<HTMLDivElement>(null);
     const { user, loading } = useCurrentUser();
     const userEmail = user?.email || "";
+    const { isUploading, uploadResume } = useResumeUploadV2();
 
     useEffect(() => {
-        if (loading) {
-            return;
-        }
-        if (!user) {
-            router.push('/login');
-        }
+        if (loading) return;
+        if (!user) router.push('/login');
     }, [user, router, loading]);
-
-    useEffect(() => {
-        if (uploadSuccess && resumeData && analysisRef.current) {
-            analysisRef.current.scrollIntoView({ 
-                behavior: 'smooth',
-                block: 'start'
-            });
-        }
-    }, [uploadSuccess, resumeData]);
 
     const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -45,10 +29,8 @@ export default function ResumeUploadSection() {
     const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         e.stopPropagation();
-
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            const droppedFile = e.dataTransfer.files[0];
-            validateAndSetFile(droppedFile);
+            validateAndSetFile(e.dataTransfer.files[0]);
         }
     };
 
@@ -64,218 +46,161 @@ export default function ResumeUploadSection() {
             toast.error("Please upload a PDF or Word document");
             return;
         }
-
         if (file.size > 5 * 1024 * 1024) {
             toast.error("File size should not exceed 5MB");
             return;
         }
-
         setFile(file);
-        setUploadSuccess(false);
     };
 
     const handleUpload = async () => {
         if (!file) return;
         setUploading(true);
-
         if (!userEmail) {
             toast.error("User email not found");
             setUploading(false);
             return;
         }
 
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("user_email", userEmail);
-
-        const analyzingToastId = toast.loading("Analyzing your resume...");
+        const analyzingToastId = toast.loading("Uploading your resume...");
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/resume/upload`, {
-                method: "POST",
-                body: formData,
-            });
-            if (!response.ok) {
-                throw new Error("Upload failed");
-            }
-            
-            const data = await response.json();
-
-            const task_id = data.task_id;
-
-            await pullEmbedderTask(task_id,userEmail)
-
-            setResumeData(data.resume);
-            setUploadSuccess(true);
-            toast.success("Resume uploaded and analyzed successfully!", { id: analyzingToastId });
-          
-
+            const data = await uploadResume(file, userEmail);
+            toast.success("Resume upload queued for processing", { id: analyzingToastId });
+            router.push(`/uploads?upload_id=${data.upload_id}`);
         } catch (error) {
-            toast.error("Failed to upload/analyze resume. Please try again.", { id: analyzingToastId });
+            toast.error("Failed to upload resume. Please try again.", { id: analyzingToastId });
         } finally {
             setUploading(false);
         }
     };
 
-    const triggerFileInput = () => {
-        fileInputRef.current?.click();
-    };
-
+    const triggerFileInput = () => fileInputRef.current?.click();
     const removeFile = () => {
         setFile(null);
-        setUploadSuccess(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     return (
-        <div>
+        <div className="min-h-screen bg-brand text-brand relative overflow-hidden">
+            <div className="noise-bg" aria-hidden="true" />
             <Navbar />
-            <div className="bg-blue-50 min-h-screen py-20 px-6">
-                <Toaster position="top-center" richColors />
-
-                <div className="max-w-6xl mx-auto">
-                    <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-                        <div className="grid md:grid-cols-5">
-                            <div className="md:col-span-2 bg-gradient-to-br from-blue-500 to-blue-600 text-white p-10 flex flex-col justify-center min-h-[600px]">
-                                <h2 className="text-3xl font-bold mb-8">Unlock Your Career Potential</h2>
-
-                                <div className="space-y-8">
-                                    <div className="flex items-start">
-                                        <div className="bg-white bg-opacity-15 p-3 rounded-lg mr-5">
-                                            <FileText className="h-7 w-7" />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-semibold text-xl">Smart Job Matching</h3>
-                                            <p className="text-blue-50 mt-2 text-lg">Our AI analyzes your skills and experience to find perfect job matches.</p>
-                                        </div>
+            <Toaster position="top-center" richColors />
+            
+            <div className="pt-24 pb-20 px-4 sm:px-6 lg:px-8">
+                <div className="max-w-7xl mx-auto">
+                    <div className="grid lg:grid-cols-2 gap-8 mb-12">
+                        <div className="glass-panel p-8 md:p-12 rounded-3xl border border-white/10">
+                            <h2 className="text-3xl md:text-4xl font-medium text-white mb-4">Unlock Your Career Potential</h2>
+                            <p className="text-brand-muted text-base mb-8">Upload your resume and let AI match you with opportunities tailored to your skills.</p>
+                            
+                            <div className="space-y-5">
+                                <div className="flex items-start gap-4">
+                                    <div className="bg-brand-primary-soft p-2.5 rounded-xl shrink-0">
+                                        <Target className="h-5 w-5 text-brand-primary" />
                                     </div>
-
-                                    <div className="flex items-start">
-                                        <div className="bg-white bg-opacity-15 p-3 rounded-lg mr-5">
-                                            <Check className="h-7 w-7" />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-semibold text-xl">Top Candidate Ranking</h3>
-                                            <p className="text-blue-50 mt-2 text-lg">See jobs where you'll be a top candidate based on your qualifications.</p>
-                                        </div>
+                                    <div>
+                                        <h3 className="font-medium text-base text-white mb-1.5">Smart Job Matching</h3>
+                                        <p className="text-brand-muted text-sm">Our AI analyzes your skills and experience to find perfect job matches.</p>
                                     </div>
+                                </div>
 
-                                    <div className="flex items-start">
-                                        <div className="bg-white bg-opacity-15 p-3 rounded-lg mr-5">
-                                            <FilePlus className="h-7 w-7" />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-semibold text-xl">Personalized Insights</h3>
-                                            <p className="text-blue-50 mt-2 text-lg">Get tailored suggestions to improve your application success rate.</p>
-                                        </div>
+                                <div className="flex items-start gap-4">
+                                    <div className="bg-brand-primary-soft p-2.5 rounded-xl shrink-0">
+                                        <Zap className="h-5 w-5 text-brand-primary" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-medium text-base text-white mb-1.5">Top Candidate Ranking</h3>
+                                        <p className="text-brand-muted text-sm">See jobs where you'll be a top candidate based on your qualifications.</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-4">
+                                    <div className="bg-brand-primary-soft p-2.5 rounded-xl shrink-0">
+                                        <Sparkles className="h-5 w-5 text-brand-primary" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-medium text-base text-white mb-1.5">Personalized Insights</h3>
+                                        <p className="text-brand-muted text-sm">Get tailored suggestions to improve your application success rate.</p>
                                     </div>
                                 </div>
                             </div>
+                        </div>
 
-                            <div className="md:col-span-3 p-12 min-h-[600px]">
-                                <div className="text-center mb-10">
-                                    <h2 className="text-3xl font-bold text-gray-800">Upload Your Resume</h2>
-                                    <p className="text-gray-600 mt-3 text-lg">Get personalized job recommendations tailored to your skills and experience</p>
+                        <div className="glass-panel p-8 md:p-12 rounded-3xl border border-white/10">
+                            <div className="text-center mb-8">
+                                <h2 className="text-2xl font-medium text-white mb-2">Upload Your Resume</h2>
+                                <p className="text-brand-muted text-sm">Get personalized job recommendations tailored to your skills</p>
+                            </div>
+
+                            {!file ? (
+                                <div
+                                    className="border-2 border-dashed border-brand-border rounded-2xl p-12 text-center cursor-pointer hover:border-brand-primary-soft transition min-h-[350px] flex flex-col justify-center"
+                                    onDragOver={handleDragOver}
+                                    onDrop={handleDrop}
+                                    onClick={triggerFileInput}
+                                >
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        className="hidden"
+                                        accept=".pdf,.doc,.docx"
+                                        onChange={handleFileChange}
+                                    />
+                                    <div className="flex justify-center mb-5">
+                                        <div className="bg-brand-primary-soft p-5 rounded-full">
+                                            <Upload className="h-8 w-8 text-brand-primary" />
+                                        </div>
+                                    </div>
+                                    <h3 className="font-medium text-base text-white mb-2">Drag and drop your resume here</h3>
+                                    <p className="text-brand-muted text-sm mb-6">Support for PDF, DOC, and DOCX (Max 5MB)</p>
+                                    <button className="btn-primary px-6 py-2.5 rounded-lg text-sm font-medium mx-auto">
+                                        Browse Files
+                                    </button>
                                 </div>
-
-                                {!file ? (
-                                    <div
-                                        className="border-2 border-dashed border-blue-200 rounded-xl p-12 text-center cursor-pointer hover:bg-blue-50 transition min-h-[350px] flex flex-col justify-center"
-                                        onDragOver={handleDragOver}
-                                        onDrop={handleDrop}
-                                        onClick={triggerFileInput}
-                                    >
-                                        <input
-                                            type="file"
-                                            ref={fileInputRef}
-                                            className="hidden"
-                                            accept=".pdf,.doc,.docx"
-                                            onChange={handleFileChange}
-                                        />
-
-                                        <div className="flex justify-center mb-6">
-                                            <div className="bg-blue-100 p-6 rounded-full">
-                                                <Upload className="h-10 w-10 text-blue-500" />
+                            ) : (
+                                <div className="border-2 border-brand-primary-soft bg-brand-primary-soft/20 rounded-2xl p-6 min-h-[350px] flex flex-col">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="bg-brand-primary-soft p-3 rounded-xl shrink-0">
+                                                <FileText className="h-6 w-6 text-brand-primary" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h3 className="font-medium text-base text-white truncate">{file.name}</h3>
+                                                <p className="text-brand-muted text-xs">
+                                                    {(file.size / (1024 * 1024)).toFixed(2)} MB • {file.type.split('/')[1].toUpperCase()}
+                                                </p>
                                             </div>
                                         </div>
-
-                                        <h3 className="font-medium text-xl text-gray-800">
-                                            Drag and drop your resume here
-                                        </h3>
-                                        <p className="text-gray-500 mt-3 mb-6 text-lg">
-                                            Support for PDF, DOC, and DOCX (Max 5MB)
-                                        </p>
-
-                                        <button
-                                            className="bg-blue-500 text-white px-8 py-3 rounded-lg hover:bg-blue-600 transition font-medium text-lg mx-auto"
-                                        >
-                                            Browse Files
+                                        <button onClick={removeFile} className="text-brand-muted hover:text-brand-primary p-2 shrink-0">
+                                            <X className="h-5 w-5" />
                                         </button>
                                     </div>
-                                ) : (
-                                    <div className="border-2 border-blue-100 bg-blue-50 rounded-xl p-8 min-h-[350px] flex flex-col">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center">
-                                                <div className="bg-blue-100 p-4 rounded-lg mr-5">
-                                                    <FileText className="h-8 w-8 text-blue-500" />
-                                                </div>
-                                                <div>
-                                                    <h3 className="font-medium text-xl text-gray-800 truncate max-w-xs">
-                                                        {file.name}
-                                                    </h3>
-                                                    <p className="text-gray-500 text-lg">
-                                                        {(file.size / (1024 * 1024)).toFixed(2)} MB • {file.type.split('/')[1].toUpperCase()}
-                                                    </p>
-                                                </div>
-                                            </div>
 
-                                            <button
-                                                onClick={removeFile}
-                                                className="text-gray-500 hover:text-red-500 p-2"
-                                            >
-                                                <X className="h-6 w-6" />
-                                            </button>
-                                        </div>
-
-                                        {!uploadSuccess ? (
-                                            <button
-                                                onClick={handleUpload}
-                                                disabled={uploading}
-                                                className={`mt-auto w-full bg-blue-500 text-white py-4 rounded-lg flex items-center justify-center transition text-lg font-medium ${uploading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-blue-600'
-                                                    }`}
-                                            >
-                                                {uploading ? (
-                                                    <>
-                                                        <Loader2 className="animate-spin mr-3 h-6 w-6" />
-                                                        Uploading...
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        Upload Resume
-                                                    </>
-                                                )}
-                                            </button>
+                                    <button
+                                        onClick={handleUpload}
+                                        disabled={uploading || isUploading}
+                                        className={`mt-auto w-full btn-primary py-4 rounded-lg flex items-center justify-center gap-2 font-medium ${
+                                            uploading || isUploading ? 'opacity-70 cursor-not-allowed' : ''
+                                        }`}
+                                    >
+                                        {uploading || isUploading ? (
+                                            <>
+                                                <Loader2 className="animate-spin h-5 w-5" />
+                                                Uploading...
+                                            </>
                                         ) : (
-                                            <div className="mt-auto bg-green-50 text-green-800 p-4 rounded-lg flex items-center text-lg">
-                                                <Check className="h-6 w-6 mr-3" />
-                                                Resume uploaded successfully! We're analyzing your profile.
-                                            </div>
+                                            <>Upload Resume</>
                                         )}
-                                    </div>
-                                )}
-
-                                <div className="mt-8 text-center text-gray-600">
-                                    <p>Your resume data is secure and will only be used to provide you with job recommendations.</p>
-                                    <p className="mt-2">By uploading, you agree to our <a href="#" className="text-blue-500 hover:underline">Terms of Service</a> and <a href="#" className="text-blue-500 hover:underline">Privacy Policy</a>.</p>
+                                    </button>
                                 </div>
+                            )}
+
+                            <div className="mt-8 text-center text-sm text-brand-muted">
+                                <p>Your resume data is secure and will only be used to provide you with job recommendations.</p>
+                                <p className="mt-2">By uploading, you agree to our <a href="#" className="text-brand-primary hover:opacity-80">Terms of Service</a> and <a href="#" className="text-brand-primary hover:opacity-80">Privacy Policy</a>.</p>
                             </div>
                         </div>
                     </div>
-
-                    {uploadSuccess && resumeData && (
-                        <div className="mt-10" ref={analysisRef}>
-                            <ResumeAnalysis data={resumeData} />
-                        </div>
-                    )}
                 </div>
             </div>
         </div>

@@ -37,12 +37,12 @@ const Hero = () => {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <button className="group relative px-8 py-4 btn-primary font-semibold text-lg overflow-hidden transition-all hover:pr-10">
+              <a href="/upload" className="group relative px-8 py-4 btn-primary font-semibold text-lg overflow-hidden transition-all hover:pr-10 inline-flex items-center justify-center">
                 <span className="relative z-10 flex items-center gap-2">
                   Upload Resume <Upload size={18} />
                 </span>
                 <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity" />
-              </button>
+              </a>
 
               <button className="px-8 py-4 btn-ghost font-medium hover:bg-white/5 transition-all">
                 View Demo

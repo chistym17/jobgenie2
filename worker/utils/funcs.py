@@ -1,16 +1,4 @@
 import datetime
-import bson
-
-def clean_crew_output(raw):
-    s = raw.strip()
-    if s.startswith('```json'):
-        s = s[len('```json'):].strip()
-    if s.startswith('```'):
-        s = s[len('```'):].strip()
-    if s.endswith('```'):
-        s = s[:-3].strip()
-    return s
-
 
 def sanitize_resume(resume):
     if isinstance(resume, dict):

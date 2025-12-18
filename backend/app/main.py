@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1 import api, health
+from app.api.v1 import api as api_v1, health
+from app.api.v2 import api as api_v2
 import uvicorn
 
 app = FastAPI(
@@ -17,7 +18,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(api.router, prefix="/api/v1")
+app.include_router(api_v1.router, prefix="/api/v1")
+app.include_router(api_v2.router, prefix="/api/v2")
 app.include_router(health.router, prefix="/api/v1/health")
 
 @app.get("/")

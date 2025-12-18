@@ -1,12 +1,9 @@
-from db import fetch_all_jobs, fetch_resume_data
-from fastapi import APIRouter
-from utils.qdrant_service import search_similar, delete_collection, get_resume_embedding_by_email
+from db import fetch_resume_data
+from utils.qdrant_service import search_similar, get_resume_embedding_by_email
 from utils.embedder import get_embedding
 import numpy as np
 import re
 from utils.qdrant_service import insert_resume_embedding
-
-router = APIRouter()
 
 def chunk_text(text, max_length=500):
     sentences = re.split(r'(?<=[.!?]) +', text)
@@ -40,7 +37,6 @@ def extract_relevant_resume_text(resume):
  
     return '\n'.join(parts)
 
-@router.get("/fetch_recommendations")
 def fetch_recommendations(user_email: str):
     
     embedding = get_resume_embedding_by_email(user_email)

@@ -1,0 +1,20 @@
+from __future__ import annotations
+
+import os
+
+from celery import Celery
+
+
+def create_celery_client() -> Celery:
+    broker_url = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+    result_backend = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+    return Celery(
+        "jobgenie",
+        broker=broker_url,
+        backend=result_backend,
+    )
+
+
+celery_client: Celery = create_celery_client()
+
+

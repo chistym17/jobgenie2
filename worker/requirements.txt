@@ -19,3 +19,5 @@ pydantic
 cohere
 celery
 redis
+google-genai
+PyPDF2
