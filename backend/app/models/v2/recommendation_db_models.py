@@ -31,3 +31,4 @@ class Recommendation(BaseModel):
         populate_by_name = True
         json_encoders = {ObjectId: str}
 
+

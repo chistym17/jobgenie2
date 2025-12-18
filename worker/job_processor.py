@@ -14,9 +14,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-REQUESTS_PER_MINUTE = 10
+REQUESTS_PER_MINUTE = 8
 MINUTE = 60
-RATE_LIMIT_DELAY = MINUTE / REQUESTS_PER_MINUTE
+RATE_LIMIT_DELAY = 7
 
 class JobProcessor:
     def __init__(self):

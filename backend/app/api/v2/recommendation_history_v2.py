@@ -51,3 +51,4 @@ async def get_recommendations_by_upload(upload_id: str):
         logger.error("Error fetching recommendations for upload_id=%s err=%s", upload_id, e)
         raise HTTPException(status_code=500, detail=f"Failed to fetch recommendations: {str(e)}")
 
+
