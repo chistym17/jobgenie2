@@ -84,68 +84,68 @@ export default function ResumeUploadSection() {
         <div className="min-h-screen bg-brand text-brand relative overflow-hidden">
             <div className="noise-bg" aria-hidden="true" />
             <Navbar />
-            <Toaster position="top-center" richColors />
-            
+                <Toaster position="top-center" richColors />
+
             <div className="pt-24 pb-20 px-4 sm:px-6 lg:px-8">
                 <div className="max-w-7xl mx-auto">
                     <div className="grid lg:grid-cols-2 gap-8 mb-12">
                         <div className="glass-panel p-8 md:p-12 rounded-3xl border border-white/10">
                             <h2 className="text-3xl md:text-4xl font-medium text-white mb-4">Unlock Your Career Potential</h2>
                             <p className="text-brand-muted text-base mb-8">Upload your resume and let AI match you with opportunities tailored to your skills.</p>
-                            
+
                             <div className="space-y-5">
                                 <div className="flex items-start gap-4">
                                     <div className="bg-brand-primary-soft p-2.5 rounded-xl shrink-0">
                                         <Target className="h-5 w-5 text-brand-primary" />
-                                    </div>
-                                    <div>
+                                        </div>
+                                        <div>
                                         <h3 className="font-medium text-base text-white mb-1.5">Smart Job Matching</h3>
                                         <p className="text-brand-muted text-sm">Our AI analyzes your skills and experience to find perfect job matches.</p>
+                                        </div>
                                     </div>
-                                </div>
 
                                 <div className="flex items-start gap-4">
                                     <div className="bg-brand-primary-soft p-2.5 rounded-xl shrink-0">
                                         <Zap className="h-5 w-5 text-brand-primary" />
-                                    </div>
-                                    <div>
+                                        </div>
+                                        <div>
                                         <h3 className="font-medium text-base text-white mb-1.5">Top Candidate Ranking</h3>
                                         <p className="text-brand-muted text-sm">See jobs where you'll be a top candidate based on your qualifications.</p>
+                                        </div>
                                     </div>
-                                </div>
 
                                 <div className="flex items-start gap-4">
                                     <div className="bg-brand-primary-soft p-2.5 rounded-xl shrink-0">
                                         <Sparkles className="h-5 w-5 text-brand-primary" />
-                                    </div>
-                                    <div>
+                                        </div>
+                                        <div>
                                         <h3 className="font-medium text-base text-white mb-1.5">Personalized Insights</h3>
                                         <p className="text-brand-muted text-sm">Get tailored suggestions to improve your application success rate.</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
                         <div className="glass-panel p-8 md:p-12 rounded-3xl border border-white/10">
                             <div className="text-center mb-8">
                                 <h2 className="text-2xl font-medium text-white mb-2">Upload Your Resume</h2>
                                 <p className="text-brand-muted text-sm">Get personalized job recommendations tailored to your skills</p>
-                            </div>
+                                </div>
 
-                            {!file ? (
-                                <div
+                                {!file ? (
+                                    <div
                                     className="border-2 border-dashed border-brand-border rounded-2xl p-12 text-center cursor-pointer hover:border-brand-primary-soft transition min-h-[350px] flex flex-col justify-center"
-                                    onDragOver={handleDragOver}
-                                    onDrop={handleDrop}
-                                    onClick={triggerFileInput}
-                                >
-                                    <input
-                                        type="file"
-                                        ref={fileInputRef}
-                                        className="hidden"
-                                        accept=".pdf,.doc,.docx"
-                                        onChange={handleFileChange}
-                                    />
+                                        onDragOver={handleDragOver}
+                                        onDrop={handleDrop}
+                                        onClick={triggerFileInput}
+                                    >
+                                        <input
+                                            type="file"
+                                            ref={fileInputRef}
+                                            className="hidden"
+                                            accept=".pdf,.doc,.docx"
+                                            onChange={handleFileChange}
+                                        />
                                     <div className="flex justify-center mb-5">
                                         <div className="bg-brand-primary-soft p-5 rounded-full">
                                             <Upload className="h-8 w-8 text-brand-primary" />
@@ -154,49 +154,49 @@ export default function ResumeUploadSection() {
                                     <h3 className="font-medium text-base text-white mb-2">Drag and drop your resume here</h3>
                                     <p className="text-brand-muted text-sm mb-6">Support for PDF, DOC, and DOCX (Max 5MB)</p>
                                     <button className="btn-primary px-6 py-2.5 rounded-lg text-sm font-medium mx-auto">
-                                        Browse Files
-                                    </button>
-                                </div>
-                            ) : (
+                                            Browse Files
+                                        </button>
+                                    </div>
+                                ) : (
                                 <div className="border-2 border-brand-primary-soft bg-brand-primary-soft/20 rounded-2xl p-6 min-h-[350px] flex flex-col">
                                     <div className="flex items-center justify-between mb-6">
                                         <div className="flex items-center gap-3 min-w-0">
                                             <div className="bg-brand-primary-soft p-3 rounded-xl shrink-0">
                                                 <FileText className="h-6 w-6 text-brand-primary" />
-                                            </div>
+                                                </div>
                                             <div className="min-w-0">
                                                 <h3 className="font-medium text-base text-white truncate">{file.name}</h3>
                                                 <p className="text-brand-muted text-xs">
-                                                    {(file.size / (1024 * 1024)).toFixed(2)} MB • {file.type.split('/')[1].toUpperCase()}
-                                                </p>
+                                                        {(file.size / (1024 * 1024)).toFixed(2)} MB • {file.type.split('/')[1].toUpperCase()}
+                                                    </p>
+                                                </div>
                                             </div>
-                                        </div>
                                         <button onClick={removeFile} className="text-brand-muted hover:text-brand-primary p-2 shrink-0">
                                             <X className="h-5 w-5" />
-                                        </button>
-                                    </div>
+                                            </button>
+                                        </div>
 
-                                    <button
-                                        onClick={handleUpload}
+                                            <button
+                                                onClick={handleUpload}
                                         disabled={uploading || isUploading}
                                         className={`mt-auto w-full btn-primary py-4 rounded-lg flex items-center justify-center gap-2 font-medium ${
                                             uploading || isUploading ? 'opacity-70 cursor-not-allowed' : ''
-                                        }`}
-                                    >
+                                                    }`}
+                                            >
                                         {uploading || isUploading ? (
-                                            <>
+                                                    <>
                                                 <Loader2 className="animate-spin h-5 w-5" />
-                                                Uploading...
-                                            </>
-                                        ) : (
+                                                        Uploading...
+                                                    </>
+                                                ) : (
                                             <>Upload Resume</>
-                                        )}
-                                    </button>
-                                </div>
-                            )}
+                                                )}
+                                            </button>
+                                    </div>
+                                )}
 
                             <div className="mt-8 text-center text-sm text-brand-muted">
-                                <p>Your resume data is secure and will only be used to provide you with job recommendations.</p>
+                                    <p>Your resume data is secure and will only be used to provide you with job recommendations.</p>
                                 <p className="mt-2">By uploading, you agree to our <a href="#" className="text-brand-primary hover:opacity-80">Terms of Service</a> and <a href="#" className="text-brand-primary hover:opacity-80">Privacy Policy</a>.</p>
                             </div>
                         </div>

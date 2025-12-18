@@ -20,26 +20,30 @@ Transform each job into a JSON object with these fields:
 - Direct Link
 - Match Score (as a percentage, e.g., 55 for 55%)
 
-Return ONLY a valid JSON array with up to 5 best matching jobs. Each job should be a JSON object.
-Do not include any markdown, explanations, or text outside the JSON array.
-The Match Score should be a number representing the percentage match (0-100).
+CRITICAL JSON FORMATTING RULES:
+1. Return ONLY a valid JSON array - no markdown, no explanations, no text before or after
+2. All string values MUST be properly escaped - use \\" for quotes inside strings
+3. The Match Score must be a number (0-100), not a string
+4. Ensure all commas are properly placed between array elements and object properties
+5. Do not include trailing commas
+6. All special characters in strings must be escaped (newlines as \\n, quotes as \\")
 
-Example format:
+Return ONLY the JSON array, nothing else. Example format:
 [
   {{
-    "Job Title": "...",
-    "Company Name": "...",
-    "Location": "...",
-    "Job Type": "...",
-    "Salary": "...",
-    "Posted Date": "...",
-    "Application Deadline": "...",
-    "Key Requirements": "...",
-    "Bonus Skills": "...",
-    "Stack": "...",
-    "Description": "...",
-    "How to Apply": "...",
-    "Direct Link": "...",
+    "Job Title": "Software Engineer",
+    "Company Name": "Tech Corp",
+    "Location": "San Francisco, CA",
+    "Job Type": "Full-time",
+    "Salary": "$120k-150k",
+    "Posted Date": "2024-01-15",
+    "Application Deadline": "2024-02-15",
+    "Key Requirements": "5+ years Python, React experience",
+    "Bonus Skills": "Docker, AWS",
+    "Stack": "Python, React, PostgreSQL",
+    "Description": "We are looking for...",
+    "How to Apply": "Send resume to jobs@techcorp.com",
+    "Direct Link": "https://example.com/job/123",
     "Match Score": 85
   }}
 ]

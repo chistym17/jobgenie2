@@ -255,18 +255,56 @@ export default function ResumeUploadsDashboard() {
                   <h2 className="text-base sm:text-lg font-medium text-white mb-2">
                     Your recommendations
                   </h2>
-                  <p className="text-xs sm:text-sm text-brand-muted mb-6">
-                    Once your latest resume is processed, this space will highlight recommended roles and explain why they fit.
-                  </p>
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 flex flex-col items-center justify-center gap-3">
-                    <Sparkles className="h-6 w-6 text-brand-secondary" />
-                    <p className="text-sm text-white">
-                      Recommendations will appear here after processing.
-                    </p>
-                    <p className="text-xs text-brand-muted">
-                      Upload a resume or re-run matching from the recommendations page.
-                    </p>
-                  </div>
+                  {focusedStatus === "completed" || focusedStatus === "recommendations" ? (
+                    <>
+                      <p className="text-xs sm:text-sm text-brand-muted mb-6">
+                        Your latest resume has been processed and recommendations are ready. View them to see where you are the best fit.
+                      </p>
+                      <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-6 flex flex-col items-center justify-center gap-3">
+                        <Sparkles className="h-6 w-6 text-emerald-300" />
+                        <p className="text-sm text-white">
+                          Recommendations are ready based on your latest profile.
+                        </p>
+                        <a
+                          href="/recommendations"
+                          className="inline-flex items-center justify-center gap-2 rounded-full px-5 py-2 text-xs sm:text-sm font-medium bg-white text-brand-ink"
+                        >
+                          Go to recommendations
+                          <ArrowUpRight className="h-4 w-4" />
+                        </a>
+                      </div>
+                    </>
+                  ) : focusedStatus === "embedding" || focusedStatus === "embedding_completed" ? (
+                    <>
+                      <p className="text-xs sm:text-sm text-brand-muted mb-6">
+                        We are preparing embeddings and recommendations for your latest resume. This will only take a moment.
+                      </p>
+                      <div className="rounded-2xl border border-brand-secondary/40 bg-brand-secondary-soft p-6 flex flex-col items-center justify-center gap-3">
+                        <Sparkles className="h-6 w-6 text-brand-secondary" />
+                        <p className="text-sm text-white">
+                          Preparing your recommendations...
+                        </p>
+                        <p className="text-xs text-brand-muted">
+                          You can stay on this page while we finish the computation.
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs sm:text-sm text-brand-muted mb-6">
+                        Once your latest resume is processed, this space will highlight recommended roles and explain why they fit.
+                      </p>
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 flex flex-col items-center justify-center gap-3">
+                        <Sparkles className="h-6 w-6 text-brand-secondary" />
+                        <p className="text-sm text-white">
+                          Recommendations will appear here after processing.
+                        </p>
+                        <p className="text-xs text-brand-muted">
+                          Upload a resume or re-run matching from the recommendations page.
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -307,17 +345,9 @@ export default function ResumeUploadsDashboard() {
                           ? "Latest upload is being tracked"
                           : "No active upload selected"}
                       </p>
-                      <p
-                        className={`text-sm ${
-                          focusedStatus === "parsed" || focusedStatus === "completed"
-                            ? "text-emerald-300"
-                            : focusedStatus === "failed" || focusedStatus === "parsing_failed"
-                            ? "text-red-300"
-                            : "text-brand-muted"
-                        }`}
-                      >
+                      <p className="text-sm text-brand-muted">
                         {focusedUploadId
-                          ? focusedStatus || "Fetching status..."
+                          ? focusedStatus || "Fetching upload status..."
                           : "Upload a resume to see live progress here."}
                       </p>
                     </div>
