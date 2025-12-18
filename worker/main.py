@@ -3,8 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import json
-from agents.initialize_crews import run_crew_for_explanation, run_crew_for_advice
-from crewai import Crew
+from services.recommendation_service import RecommendationService
 from db import fetch_resume_data
 import datetime
 from db import check_mongodb_connection
@@ -132,7 +131,8 @@ async def chat_websocket(websocket: WebSocket):
                         if not user_resume:
                             reply = f"[ERROR] Resume not found for {email}."
                         else:
-                            explanation = run_crew_for_explanation(job_obj, user_resume)
+                            service = RecommendationService()
+                            explanation = service.explain_job_match(job_obj, user_resume)
                             reply = explanation
                 elif msg_type == "suggest":
                     email = job.get("email") if job else None
@@ -144,7 +144,8 @@ async def chat_websocket(websocket: WebSocket):
                         if not user_resume:
                             reply = f"[ERROR] Resume not found for {email}."
                         else:
-                            advice = run_crew_for_advice(job_obj, user_resume)
+                            service = RecommendationService()
+                            advice = service.provide_resume_advice(job_obj, user_resume)
                             reply = advice
                 else:
                     reply = f"[MOCK] You said: {message}"
