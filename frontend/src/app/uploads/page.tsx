@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import Navbar from "../components/v2/Navbar";
 import ConfirmationModal from "../components/v2/ConfirmationModal";
-import { Upload, Clock, CheckCircle2, AlertTriangle, ArrowUpRight, Bell, Sparkles, X, Trash2 } from "lucide-react";
+import { Upload, Clock, CheckCircle2, AlertTriangle, ArrowUpRight, Bell, Sparkles, X, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { useUploadHistory } from "../hooks/useUploadHistory";
@@ -61,6 +61,7 @@ const statusConfig: Record<
 
 export default function ResumeUploadsDashboard() {
   const [activeTab, setActiveTab] = useState<"history" | "new" | "recommendations" | "notifications">("history");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const searchParams = useSearchParams();
   const focusedUploadId = searchParams.get("upload_id");
   const { user } = useCurrentUser();
@@ -95,87 +96,123 @@ export default function ResumeUploadsDashboard() {
       <div className="noise-bg" aria-hidden="true" />
       <Navbar />
 
-      <main className="pt-24 pb-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto space-y-10">
-          <header className="flex flex-col items-center gap-4 text-center">
-            <div>
-              <h1 className="text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight text-white">
-                Manage your workspace
-              </h1>
-              <p className="mt-3 text-sm md:text-base text-brand-muted max-w-2xl mx-auto">
-                A single place to upload resumes, track processing, review recommendations, and stay on top of notifications.
-              </p>
-            </div>
-          </header>
+      <div className="flex pt-20">
+        <aside
+          className={`fixed left-0 top-20 h-[calc(100vh-5rem)] glass-panel border-r border-white/10 transition-all duration-300 z-30 ${
+            isSidebarCollapsed ? "w-20" : "w-64"
+          }`}
+        >
+          <div className="h-full flex flex-col p-4">
+            <button
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="mb-4 p-2 rounded-lg hover:bg-white/5 transition-colors text-brand-muted hover:text-white self-end"
+              title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {isSidebarCollapsed ? (
+                <ChevronRight className="h-5 w-5" />
+              ) : (
+                <ChevronLeft className="h-5 w-5" />
+              )}
+            </button>
 
-          <div className="flex justify-center">
-            <div className="glass-panel inline-flex rounded-full border border-white/10 p-1.5 gap-1.5 bg-brand-surface/80">
+            <nav className="flex-1 space-y-2">
               <button
                 onClick={() => setActiveTab("history")}
-                className={`px-3.5 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                   activeTab === "history"
                     ? "bg-brand-primary text-brand-ink"
-                    : "text-brand-muted hover:text-white"
+                    : "text-brand-muted hover:text-white hover:bg-white/5"
                 }`}
+                title="Upload history"
               >
-                <Clock className="h-3.5 w-3.5" />
-                <span>Upload history</span>
+                <Clock className="h-5 w-5 flex-shrink-0" />
+                {!isSidebarCollapsed && (
+                  <span className="text-sm font-medium">Upload history</span>
+                )}
               </button>
+
               <button
                 onClick={() => setActiveTab("new")}
-                className={`px-3.5 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                   activeTab === "new"
                     ? "bg-brand-primary text-brand-ink"
-                    : "text-brand-muted hover:text-white"
+                    : "text-brand-muted hover:text-white hover:bg-white/5"
                 }`}
+                title="New upload"
               >
-                <Upload className="h-3.5 w-3.5" />
-                <span>New upload</span>
+                <Upload className="h-5 w-5 flex-shrink-0" />
+                {!isSidebarCollapsed && (
+                  <span className="text-sm font-medium">New upload</span>
+                )}
               </button>
+
               <button
                 onClick={() => setActiveTab("recommendations")}
-                className={`px-3.5 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                   activeTab === "recommendations"
                     ? "bg-brand-primary text-brand-ink"
-                    : "text-brand-muted hover:text-white"
+                    : "text-brand-muted hover:text-white hover:bg-white/5"
                 }`}
+                title="Your recommendations"
               >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Your recommendations</span>
+                <Sparkles className="h-5 w-5 flex-shrink-0" />
+                {!isSidebarCollapsed && (
+                  <span className="text-sm font-medium">Recommendations</span>
+                )}
               </button>
+
               <button
                 onClick={() => setActiveTab("notifications")}
-                className={`px-3.5 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                   activeTab === "notifications"
                     ? "bg-brand-primary text-brand-ink"
-                    : "text-brand-muted hover:text-white"
+                    : "text-brand-muted hover:text-white hover:bg-white/5"
                 }`}
+                title="Notifications"
               >
-                <Bell className="h-3.5 w-3.5" />
-                <span>Notifications</span>
+                <Bell className="h-5 w-5 flex-shrink-0" />
+                {!isSidebarCollapsed && (
+                  <span className="text-sm font-medium">Notifications</span>
+                )}
               </button>
-            </div>
+            </nav>
           </div>
+        </aside>
 
-          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            <div className="lg:col-span-2 glass-panel rounded-3xl border border-white/10 p-5 sm:p-6 md:p-7 min-h-[420px]">
+        <main
+          className={`flex-1 transition-all duration-300 ${
+            isSidebarCollapsed ? "ml-20" : "ml-64"
+          }`}
+        >
+          <div className="pt-8 pb-12 px-6 lg:px-10 xl:px-12">
+            <header className="mb-6 max-w-4xl mx-auto">
+              <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-white mb-2">
+                Manage your workspace
+              </h1>
+              <p className="text-xs md:text-sm text-brand-muted max-w-2xl">
+                A single place to upload resumes, track processing, review recommendations, and stay on top of notifications.
+              </p>
+            </header>
+
+            <div className="max-w-4xl mx-auto">
+              <div className="glass-panel rounded-3xl border border-white/10 p-6 sm:p-8 md:p-10 min-h-[600px]">
               {activeTab === "history" && (
                 <>
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-between mb-6">
                     <div>
-                      <h2 className="text-base sm:text-lg font-medium text-white">
+                      <h2 className="text-xl sm:text-2xl font-semibold text-white mb-2">
                         Upload history
                       </h2>
-                      <p className="text-xs sm:text-sm text-brand-muted">
+                      <p className="text-sm sm:text-base text-brand-muted">
                         Recent resumes you have analyzed with Jobgenie.
                       </p>
                     </div>
-                    <button className="text-xs sm:text-sm text-brand-muted hover:text-brand-primary transition-colors">
+                    <button className="text-sm text-brand-muted hover:text-brand-primary transition-colors">
                       View all
                     </button>
                   </div>
 
-                  <div className="border-t border-white/10 mt-4 pt-3 space-y-2.5">
+                  <div className="border-t border-white/10 mt-6 pt-6 space-y-3">
                     {isHistoryLoading && (
                       <div className="py-10 text-center text-sm text-brand-muted">
                         Loading your uploads...
@@ -191,7 +228,7 @@ export default function ResumeUploadsDashboard() {
                       return (
                         <div
                           key={upload.upload_id}
-                          className={`flex items-center justify-between gap-3 rounded-2xl px-3 py-3 sm:px-4 sm:py-3.5 hover:bg-white/[0.03] transition-colors ${
+                          className={`flex items-center justify-between gap-4 rounded-2xl px-4 py-4 sm:px-5 sm:py-4 hover:bg-white/[0.03] transition-colors ${
                             isFocused ? "border border-brand-primary-soft bg-brand-primary-soft/10" : ""
                           }`}
                         >
@@ -246,15 +283,15 @@ export default function ResumeUploadsDashboard() {
               )}
 
               {activeTab === "new" && (
-                <div className="h-full flex flex-col justify-between">
-                  <div>
-                    <h2 className="text-base sm:text-lg font-medium text-white mb-2">
+                <div className="h-full flex flex-col justify-center">
+                  <div className="max-w-2xl mx-auto">
+                    <h2 className="text-xl sm:text-2xl font-semibold text-white mb-3">
                       New upload
                     </h2>
-                    <p className="text-xs sm:text-sm text-brand-muted mb-6">
+                    <p className="text-sm sm:text-base text-brand-muted mb-8">
                       Start a fresh analysis with an updated resume.
                     </p>
-                    <div className="border border-dashed border-brand-border rounded-2xl p-8 text-center flex flex-col items-center justify-center gap-4">
+                    <div className="border border-dashed border-brand-border rounded-2xl p-12 text-center flex flex-col items-center justify-center gap-6 min-h-[400px]">
                       <div className="h-12 w-12 rounded-full bg-brand-primary-soft flex items-center justify-center">
                         <Upload className="h-6 w-6 text-brand-primary" />
                       </div>
@@ -273,16 +310,16 @@ export default function ResumeUploadsDashboard() {
               )}
 
               {activeTab === "recommendations" && (
-                <div>
-                  <h2 className="text-base sm:text-lg font-medium text-white mb-2">
+                <div className="min-h-[500px]">
+                  <h2 className="text-xl sm:text-2xl font-semibold text-white mb-3">
                     Your recommendations
                   </h2>
                   {focusedStatus === "completed" || focusedStatus === "recommendations" ? (
                     <>
-                      <p className="text-xs sm:text-sm text-brand-muted mb-6">
+                      <p className="text-sm sm:text-base text-brand-muted mb-8">
                         Your latest resume has been processed and recommendations are ready. View them to see where you are the best fit.
                       </p>
-                      <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-6 flex flex-col items-center justify-center gap-3">
+                      <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-10 flex flex-col items-center justify-center gap-4 min-h-[300px]">
                         <Sparkles className="h-6 w-6 text-emerald-300" />
                         <p className="text-sm text-white">
                           Recommendations are ready based on your latest profile.
@@ -298,10 +335,10 @@ export default function ResumeUploadsDashboard() {
                     </>
                   ) : focusedStatus === "embedding" || focusedStatus === "embedding_completed" ? (
                     <>
-                      <p className="text-xs sm:text-sm text-brand-muted mb-6">
+                      <p className="text-sm sm:text-base text-brand-muted mb-8">
                         We are preparing embeddings and recommendations for your latest resume. This will only take a moment.
                       </p>
-                      <div className="rounded-2xl border border-brand-secondary/40 bg-brand-secondary-soft p-6 flex flex-col items-center justify-center gap-3">
+                      <div className="rounded-2xl border border-brand-secondary/40 bg-brand-secondary-soft p-10 flex flex-col items-center justify-center gap-4 min-h-[300px]">
                         <Sparkles className="h-6 w-6 text-brand-secondary" />
                         <p className="text-sm text-white">
                           Preparing your recommendations...
@@ -313,10 +350,10 @@ export default function ResumeUploadsDashboard() {
                     </>
                   ) : (
                     <>
-                      <p className="text-xs sm:text-sm text-brand-muted mb-6">
+                      <p className="text-sm sm:text-base text-brand-muted mb-8">
                         Once your latest resume is processed, this space will highlight recommended roles and explain why they fit.
                       </p>
-                      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 flex flex-col items-center justify-center gap-3">
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-10 flex flex-col items-center justify-center gap-4 min-h-[300px]">
                         <Sparkles className="h-6 w-6 text-brand-secondary" />
                         <p className="text-sm text-white">
                           Recommendations will appear here after processing.
@@ -331,184 +368,126 @@ export default function ResumeUploadsDashboard() {
               )}
 
               {activeTab === "notifications" && (
-                <div>
-                  <h2 className="text-base sm:text-lg font-medium text-white mb-2">
+                <div className="min-h-[500px]">
+                  <h2 className="text-xl sm:text-2xl font-semibold text-white mb-3">
                     Notifications
                   </h2>
-                  <p className="text-xs sm:text-sm text-brand-muted mb-6">
+                  <p className="text-sm sm:text-base text-brand-muted mb-8">
                     Track important events like completed analyses, new recommendations, and system alerts.
                   </p>
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 text-center text-sm text-brand-muted">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-base text-brand-muted min-h-[300px] flex items-center justify-center">
                     No notifications yet. You will see updates here as you start using your workspace.
                   </div>
                 </div>
               )}
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <ConfirmationModal
+        isOpen={!!deleteConfirmUploadId}
+        onClose={() => setDeleteConfirmUploadId(null)}
+        onConfirm={() => {
+          if (deleteConfirmUploadId) {
+            handleDelete(deleteConfirmUploadId);
+          }
+        }}
+        title="Delete Resume Upload"
+        message={`Are you sure you want to delete "${uploadsToShow.find(u => u.upload_id === deleteConfirmUploadId)?.file_name || 'this upload'}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
+
+      {detailUploadId && detail && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center px-4 sm:px-6" onClick={() => setDetailUploadId(null)}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div
+            className="relative z-10 max-w-3xl w-full max-h-[80vh] bg-black/80 rounded-3xl border border-white/20 p-6 sm:p-8 overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-brand-muted mb-1">
+                  Parsed resume
+                </p>
+                <h3 className="text-xl sm:text-2xl font-semibold text-white">
+                  {detail.name || "Unnamed candidate"}
+                </h3>
+                {detail.contact?.email && (
+                  <p className="text-xs sm:text-sm text-brand-muted mt-1">
+                    {detail.contact.email}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setDetailUploadId(null)}
+                className="text-brand-muted hover:text-white rounded-full p-1"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
-            <aside className="space-y-4">
-              <div className="glass-panel rounded-3xl border border-white/10 p-5 sm:p-6 min-h-[220px] flex flex-col justify-between">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-medium text-white">
-                    Current activity
-                  </h3>
-                  <span className="text-[11px] uppercase tracking-wide text-brand-muted">
-                    Preview
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full bg-brand-primary-soft flex items-center justify-center">
-                      <Clock className="h-4 w-4 text-brand-primary" />
-                    </div>
-                    <div>
-                      <p className="text-base text-white">
-                        {focusedUploadId
-                          ? "Latest upload is being tracked"
-                          : "No active upload selected"}
-                      </p>
-                      <p className="text-sm text-brand-muted">
-                        {focusedUploadId
-                          ? focusedStatus || "Fetching upload status..."
-                          : "Upload a resume to see live progress here."}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full bg-brand-secondary-soft flex items-center justify-center">
-                      <CheckCircle2 className="h-4 w-4 text-brand-secondary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-white">
-                        Recommendations in progress
-                      </p>
-                      <p className="text-xs text-brand-muted">
-                        Soon you will see updated job matches tailored to your
-                        latest profile.
-                      </p>
-                    </div>
-                  </div>
+            {detail.skills && detail.skills.length > 0 && (
+              <div className="mb-5">
+                <p className="text-xs uppercase tracking-wide text-brand-muted mb-2">
+                  Key skills
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {detail.skills.slice(0, 10).map((skill, idx) => (
+                    <span
+                      key={idx}
+                      className="bg-brand-primary-soft text-brand-primary px-3 py-1 rounded-full text-xs border border-brand-primary-soft"
+                    >
+                      {skill}
+                    </span>
+                  ))}
                 </div>
               </div>
+            )}
 
-              <div className="glass-panel rounded-3xl border border-white/10 p-5 sm:p-6">
-                <h3 className="text-sm font-medium text-white mb-2">
-                  Tips for best results
-                </h3>
-                <ul className="space-y-2.5 text-xs text-brand-muted">
-                  <li>Keep your resume to 1–3 pages.</li>
-                  <li>Highlight impact with metrics and concrete outcomes.</li>
-                  <li>Use a recent version that reflects your latest role.</li>
-                </ul>
-              </div>
-            </aside>
-          </section>
-
-          <ConfirmationModal
-            isOpen={!!deleteConfirmUploadId}
-            onClose={() => setDeleteConfirmUploadId(null)}
-            onConfirm={() => {
-              if (deleteConfirmUploadId) {
-                handleDelete(deleteConfirmUploadId);
-              }
-            }}
-            title="Delete Resume Upload"
-            message={`Are you sure you want to delete "${uploadsToShow.find(u => u.upload_id === deleteConfirmUploadId)?.file_name || 'this upload'}"? This action cannot be undone.`}
-            confirmText="Delete"
-            cancelText="Cancel"
-            variant="danger"
-          />
-
-          {detailUploadId && detail && (
-            <div className="fixed inset-0 z-40 flex items-center justify-center px-4 sm:px-6" onClick={() => setDetailUploadId(null)}>
-              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-              <div
-                className="relative z-10 max-w-3xl w-full max-h-[80vh] bg-black/80 rounded-3xl border border-white/20 p-6 sm:p-8 overflow-hidden flex flex-col"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-brand-muted mb-1">
-                      Parsed resume
+            {detail.experience && detail.experience.length > 0 && (
+              <div className="space-y-3 mt-2 overflow-y-auto pr-1 thin-scroll">
+                <p className="text-xs uppercase tracking-wide text-brand-muted">
+                  Experience
+                </p>
+                {detail.experience.map((exp, idx) => (
+                  <div
+                    key={idx}
+                    className="border border-white/10 rounded-2xl p-3.5 bg-white/[0.02]"
+                  >
+                    <p className="text-sm text-white">
+                      {exp.position || "Role"}{" "}
+                      {exp.company && (
+                        <span className="text-brand-muted">· {exp.company}</span>
+                      )}
                     </p>
-                    <h3 className="text-xl sm:text-2xl font-semibold text-white">
-                      {detail.name || "Unnamed candidate"}
-                    </h3>
-                    {detail.contact?.email && (
-                      <p className="text-xs sm:text-sm text-brand-muted mt-1">
-                        {detail.contact.email}
+                    {exp.duration && (
+                      <p className="text-xs text-brand-muted mt-0.5">
+                        {exp.duration}
+                      </p>
+                    )}
+                    {exp.description && (
+                      <p className="text-xs text-brand-muted mt-1.5">
+                        {exp.description}
                       </p>
                     )}
                   </div>
-                  <button
-                    onClick={() => setDetailUploadId(null)}
-                    className="text-brand-muted hover:text-white rounded-full p-1"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-
-                {detail.skills && detail.skills.length > 0 && (
-                  <div className="mb-5">
-                    <p className="text-xs uppercase tracking-wide text-brand-muted mb-2">
-                      Key skills
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {detail.skills.slice(0, 10).map((skill, idx) => (
-                        <span
-                          key={idx}
-                          className="bg-brand-primary-soft text-brand-primary px-3 py-1 rounded-full text-xs border border-brand-primary-soft"
-                        >
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {detail.experience && detail.experience.length > 0 && (
-                  <div className="space-y-3 mt-2 overflow-y-auto pr-1 thin-scroll">
-                    <p className="text-xs uppercase tracking-wide text-brand-muted">
-                      Experience
-                    </p>
-                    {detail.experience.map((exp, idx) => (
-                      <div
-                        key={idx}
-                        className="border border-white/10 rounded-2xl p-3.5 bg-white/[0.02]"
-                      >
-                        <p className="text-sm text-white">
-                          {exp.position || "Role"}{" "}
-                          {exp.company && (
-                            <span className="text-brand-muted">· {exp.company}</span>
-                          )}
-                        </p>
-                        {exp.duration && (
-                          <p className="text-xs text-brand-muted mt-0.5">
-                            {exp.duration}
-                          </p>
-                        )}
-                        {exp.description && (
-                          <p className="text-xs text-brand-muted mt-1.5">
-                            {exp.description}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {(!detail.skills || detail.skills.length === 0) &&
-                  (!detail.experience || detail.experience.length === 0) && (
-                    <p className="text-sm text-brand-muted mt-4">
-                      Parsed data is not available yet for this resume.
-                    </p>
-                  )}
+                ))}
               </div>
-            </div>
-          )}
+            )}
+
+            {(!detail.skills || detail.skills.length === 0) &&
+              (!detail.experience || detail.experience.length === 0) && (
+                <p className="text-sm text-brand-muted mt-4">
+                  Parsed data is not available yet for this resume.
+                </p>
+              )}
+          </div>
         </div>
-      </main>
+      )}
     </div>
   );
 }
