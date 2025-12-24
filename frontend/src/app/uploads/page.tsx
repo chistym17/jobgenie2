@@ -2,12 +2,14 @@
 
 import React, { useMemo, useState } from "react";
 import Navbar from "../components/v2/Navbar";
-import { Upload, Clock, CheckCircle2, AlertTriangle, ArrowUpRight, Bell, Sparkles, X } from "lucide-react";
+import ConfirmationModal from "../components/v2/ConfirmationModal";
+import { Upload, Clock, CheckCircle2, AlertTriangle, ArrowUpRight, Bell, Sparkles, X, Trash2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { useUploadHistory } from "../hooks/useUploadHistory";
 import { useUploadStatus } from "../hooks/useUploadStatus";
 import { useResumeDetail } from "../hooks/useResumeDetail";
+import { useDeleteUpload } from "../hooks/useDeleteUpload";
 
 const statusConfig: Record<
   string,
@@ -63,10 +65,12 @@ export default function ResumeUploadsDashboard() {
   const focusedUploadId = searchParams.get("upload_id");
   const { user } = useCurrentUser();
   const userEmail = user?.email || null;
-  const { items: historyItems, isLoading: isHistoryLoading } = useUploadHistory(userEmail);
+  const { items: historyItems, isLoading: isHistoryLoading, refetch: refetchHistory } = useUploadHistory(userEmail);
   const { status: focusedStatus } = useUploadStatus(focusedUploadId, !!focusedUploadId);
   const [detailUploadId, setDetailUploadId] = useState<string | null>(null);
   const { data: detail, isLoading: isDetailLoading } = useResumeDetail(detailUploadId);
+  const { deleteUpload, isDeleting } = useDeleteUpload();
+  const [deleteConfirmUploadId, setDeleteConfirmUploadId] = useState<string | null>(null);
 
   const uploadsToShow = useMemo(() => {
     if (!historyItems.length && !focusedUploadId) return [];
@@ -75,6 +79,16 @@ export default function ResumeUploadsDashboard() {
     if (existing) return historyItems;
     return historyItems;
   }, [historyItems, focusedUploadId]);
+
+  const handleDelete = async (uploadId: string) => {
+    const success = await deleteUpload(uploadId);
+    if (success) {
+      refetchHistory();
+      if (focusedUploadId === uploadId) {
+        window.history.replaceState({}, '', '/uploads');
+      }
+    }
+  };
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text relative overflow-hidden">
@@ -195,7 +209,7 @@ export default function ResumeUploadsDashboard() {
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-3 flex-shrink-0">
+                          <div className="flex items-center gap-2 flex-shrink-0">
                             <span
                               className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] sm:text-xs font-medium ${cfg.className}`}
                             >
@@ -208,6 +222,14 @@ export default function ResumeUploadsDashboard() {
                             >
                               View
                               <ArrowUpRight className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmUploadId(upload.upload_id)}
+                              disabled={isDeleting}
+                              className="inline-flex items-center justify-center p-1.5 rounded-full border border-red-500/40 text-red-300 hover:text-white hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Delete upload"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         </div>
@@ -382,6 +404,21 @@ export default function ResumeUploadsDashboard() {
               </div>
             </aside>
           </section>
+
+          <ConfirmationModal
+            isOpen={!!deleteConfirmUploadId}
+            onClose={() => setDeleteConfirmUploadId(null)}
+            onConfirm={() => {
+              if (deleteConfirmUploadId) {
+                handleDelete(deleteConfirmUploadId);
+              }
+            }}
+            title="Delete Resume Upload"
+            message={`Are you sure you want to delete "${uploadsToShow.find(u => u.upload_id === deleteConfirmUploadId)?.file_name || 'this upload'}"? This action cannot be undone.`}
+            confirmText="Delete"
+            cancelText="Cancel"
+            variant="danger"
+          />
 
           {detailUploadId && detail && (
             <div className="fixed inset-0 z-40 flex items-center justify-center px-4 sm:px-6" onClick={() => setDetailUploadId(null)}>

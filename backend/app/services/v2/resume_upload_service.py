@@ -153,3 +153,19 @@ async def increment_retry_count(upload_id: str) -> Tuple[bool, int]:
     return True, int(result.get("retry_count", 0))
 
 
+async def delete_upload(upload_id: str) -> bool:
+    try:
+        oid = ObjectId(upload_id)
+    except Exception as exc:
+        _logger.error("Invalid upload_id passed to delete_upload: %s err=%s", upload_id, exc)
+        return False
+
+    result = await _collection.delete_one({"_id": oid})
+    if result.deleted_count == 1:
+        _logger.info("Deleted upload_id=%s", upload_id)
+        return True
+    else:
+        _logger.warning("delete_upload did not delete any document upload_id=%s", upload_id)
+        return False
+
+

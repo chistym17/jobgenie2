@@ -158,3 +158,24 @@ async def list_uploads(
     )
 
 
+@router.delete("/upload/{upload_id}")
+async def delete_upload(upload_id: str):
+    doc = await resume_upload_service.get_upload(upload_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Upload not found")
+
+    file_id = doc.get("file_path")
+    if file_id:
+        from app.services.v2.file_storage_service import FileStorageService
+        storage = FileStorageService()
+        await storage.delete_file(file_id)
+        logger.info("Deleted file from GridFS: file_id=%s for upload_id=%s", file_id, upload_id)
+
+    success = await resume_upload_service.delete_upload(upload_id)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to delete upload")
+
+    logger.info("Deleted upload_id=%s", upload_id)
+    return {"message": "Upload deleted successfully", "upload_id": upload_id}
+
+
