@@ -75,6 +75,8 @@ interface NewUploadTabProps {
   uploadResume: (file: File, userEmail: string) => Promise<{ upload_id: string }>;
   isUploading: boolean;
   router: ReturnType<typeof useRouter>;
+  setActiveTab: (tab: "history" | "new" | "recommendations" | "notifications") => void;
+  refetchHistory: () => void;
 }
 
 function NewUploadTab({
@@ -87,6 +89,8 @@ function NewUploadTab({
   uploadResume,
   isUploading,
   router,
+  setActiveTab,
+  refetchHistory,
 }: NewUploadTabProps) {
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -125,9 +129,12 @@ function NewUploadTab({
     setUploading(true);
     try {
       const data = await uploadResume(file, userEmail);
-      router.push(`/uploads?upload_id=${data.upload_id}`);
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      // Switch to history tab and refresh
+      setActiveTab("history");
+      refetchHistory();
+      router.push(`/uploads?upload_id=${data.upload_id}`);
     } catch (error) {
       // Error handling
     } finally {
@@ -143,18 +150,18 @@ function NewUploadTab({
 
   return (
     <div className="h-full">
-      <h2 className="text-lg sm:text-xl font-semibold text-white mb-2">
+      <h2 className="text-xl sm:text-2xl font-semibold text-white mb-2">
         New upload
       </h2>
-      <p className="text-xs sm:text-sm text-brand-muted mb-3">
+      <p className="text-sm sm:text-base text-brand-muted mb-4">
         Start a fresh analysis with an updated resume.
       </p>
       
       <div className="max-w-2xl mx-auto">
         <div className="glass-panel p-4 md:p-6 rounded-3xl border border-white/10">
-          <div className="text-center mb-4">
-            <h3 className="text-lg font-semibold text-white mb-1">Upload Your Resume</h3>
-            <p className="text-xs text-brand-muted">Get personalized job recommendations tailored to your skills</p>
+          <div className="text-center mb-6">
+            <h3 className="text-xl font-semibold text-white mb-2">Upload Your Resume</h3>
+            <p className="text-sm text-brand-muted">Get personalized job recommendations tailored to your skills</p>
           </div>
 
           {!file ? (
@@ -171,14 +178,14 @@ function NewUploadTab({
                 accept=".pdf"
                 onChange={handleFileChange}
               />
-              <div className="flex justify-center mb-3">
+              <div className="flex justify-center mb-4">
                 <div className="bg-brand-primary-soft p-4 rounded-full">
                   <Upload className="h-6 w-6 text-brand-primary" />
                 </div>
               </div>
-              <h3 className="font-medium text-sm text-white mb-1">Drag and drop your resume here</h3>
-              <p className="text-brand-muted text-xs mb-4">Support for PDF (Max 5MB)</p>
-              <button className="btn-primary px-4 py-2 rounded-lg text-xs font-medium mx-auto">
+              <h3 className="font-medium text-base text-white mb-2">Drag and drop your resume here</h3>
+              <p className="text-brand-muted text-sm mb-4">Support for PDF (Max 5MB)</p>
+              <button className="btn-primary px-5 py-2.5 rounded-lg text-sm font-medium mx-auto">
                 Browse Files
               </button>
             </div>
@@ -190,8 +197,8 @@ function NewUploadTab({
                     <FileText className="h-5 w-5 text-brand-primary" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-medium text-sm text-white truncate">{file.name}</h3>
-                    <p className="text-brand-muted text-[10px]">
+                    <h3 className="font-medium text-base text-white truncate">{file.name}</h3>
+                    <p className="text-brand-muted text-xs">
                       {(file.size / (1024 * 1024)).toFixed(2)} MB • PDF
                     </p>
                   </div>
@@ -220,9 +227,9 @@ function NewUploadTab({
             </div>
           )}
 
-          <div className="mt-4 text-center text-xs text-brand-muted">
+          <div className="mt-6 text-center text-sm text-brand-muted">
             <p>Your resume data is secure and will only be used to provide you with job recommendations.</p>
-            <p className="mt-1">By uploading, you agree to our <a href="#" className="text-brand-primary hover:opacity-80">Terms of Service</a> and <a href="#" className="text-brand-primary hover:opacity-80">Privacy Policy</a>.</p>
+            <p className="mt-2">By uploading, you agree to our <a href="#" className="text-brand-primary hover:opacity-80">Terms of Service</a> and <a href="#" className="text-brand-primary hover:opacity-80">Privacy Policy</a>.</p>
           </div>
         </div>
       </div>
@@ -232,6 +239,37 @@ function NewUploadTab({
 
 function ActivityTimelineTab({ focusedUploadId }: { focusedUploadId: string | null }) {
   const { activities, isLoading } = useActivityTimeline(focusedUploadId);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 4;
+
+  const totalPages = Math.ceil(activities.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedActivities = activities.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
+
+  const getPaginationGroup = () => {
+    let start = Math.max(1, currentPage - 1);
+    let end = Math.min(totalPages, currentPage + 1);
+
+    if (currentPage === 1 && totalPages > 2) {
+      end = 3;
+    }
+    if (currentPage === totalPages && totalPages > 2) {
+      start = totalPages - 2;
+    }
+
+    const pages = [];
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return pages;
+  };
 
   return (
     <div className="min-h-[500px]">
@@ -255,19 +293,74 @@ function ActivityTimelineTab({ focusedUploadId }: { focusedUploadId: string | nu
           Waiting for processing to start...
         </div>
       ) : (
-        <div className="space-y-0">
-          {activities.map((activity, index) => (
-            <NotificationItem
-              key={`${activity.step}-${activity.timestamp}-${index}`}
-              step={activity.step}
-              message={activity.message}
-              status={activity.status}
-              timestamp={activity.timestamp}
-              isLast={index === activities.length - 1}
-              errorMessage={activity.error_message}
-            />
-          ))}
-        </div>
+        <>
+          <div className="space-y-0">
+            {paginatedActivities.map((activity, index) => (
+              <NotificationItem
+                key={`${activity.step}-${activity.timestamp}-${startIndex + index}`}
+                step={activity.step}
+                message={activity.message}
+                status={activity.status}
+                timestamp={activity.timestamp}
+                isLast={index === paginatedActivities.length - 1 && currentPage === totalPages}
+                errorMessage={activity.error_message}
+              />
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-6 pt-6 border-t border-white/10">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded-lg border border-white/10 text-brand-muted hover:text-white hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="First page"
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded-lg border border-white/10 text-brand-muted hover:text-white hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Previous page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              {getPaginationGroup().map((page) => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`min-w-[32px] px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    currentPage === page
+                      ? "bg-brand-primary text-brand-ink"
+                      : "text-brand-muted hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="p-1.5 rounded-lg border border-white/10 text-brand-muted hover:text-white hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Next page"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="p-1.5 rounded-lg border border-white/10 text-brand-muted hover:text-white hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Last page"
+              >
+                <ChevronsRight className="h-4 w-4" />
+              </button>
+              <span className="text-xs text-brand-muted ml-2">
+                Showing {startIndex + 1}-{Math.min(endIndex, activities.length)} of {activities.length}
+              </span>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -601,6 +694,8 @@ export default function ResumeUploadsDashboard() {
                   uploadResume={uploadResume}
                   isUploading={isUploading}
                   router={router}
+                  setActiveTab={setActiveTab}
+                  refetchHistory={refetchHistory}
                 />
               )}
 
