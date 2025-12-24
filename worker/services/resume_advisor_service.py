@@ -11,10 +11,7 @@ class ResumeAdvisorService(BaseGeminiService):
         prompt = get_resume_advice_prompt(job_str, resume_str)
 
         try:
-            response = self.genai_client.models.generate_content(
-                model=self.model_name,
-                contents=[prompt]
-            )
+            response = self.model.generate_content(prompt)
             
             advice = response.text.strip()
             return advice

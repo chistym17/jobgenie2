@@ -72,10 +72,7 @@ class RecommenderService(BaseGeminiService):
         prompt = get_recommendation_prompt(job_data_list[:20])
 
         try:
-            response = self.genai_client.models.generate_content(
-                model=self.model_name,
-                contents=[prompt]
-            )
+            response = self.model.generate_content(prompt)
             
             response_text = response.text.strip()
             json_str = self._extract_json_from_response(response_text)
