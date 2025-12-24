@@ -32,3 +32,5 @@ class Recommendation(BaseModel):
         json_encoders = {ObjectId: str}
 
 
+
+
