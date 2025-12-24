@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
 from pydantic import BaseModel, Field
@@ -44,9 +44,12 @@ class ResumeUpload(BaseModel):
     parse_task_id: Optional[str] = None
     embedding_task_id: Optional[str] = None
     recommendation_task_id: Optional[str] = None
+    recommendation_id: Optional[ObjectId] = None
 
     error_message: Optional[str] = None
     retry_count: int = 0
+
+    activity_timeline: List[Dict[str, Any]] = Field(default_factory=list)
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

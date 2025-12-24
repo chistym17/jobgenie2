@@ -57,6 +57,12 @@ async def upload_resume_v2(
         UploadStatus.PENDING,
         parse_task_id=task.id,
     )
+    await resume_upload_service.add_activity_event(
+        upload_id,
+        "Resume Uploaded",
+        "Your resume has been uploaded and queued for processing",
+        "pending",
+    )
 
     response = UploadResumeResponse(
         upload_id=upload_id,

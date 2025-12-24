@@ -14,9 +14,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-REQUESTS_PER_MINUTE = 10
+REQUESTS_PER_MINUTE = 2
 MINUTE = 60
-RATE_LIMIT_DELAY = MINUTE / REQUESTS_PER_MINUTE
+RATE_LIMIT_DELAY = 30
 
 class JobProcessor:
     def __init__(self):
@@ -80,9 +80,14 @@ class JobProcessor:
             self._log(f"Uploading to Qdrant: {job_title}")
             init_collection()
             try:
+                job_id = job.get('id') or str(job.get('_id', ''))
                 payload = {
                     'title': job_title,
-                    'content': processed_data
+                    'content': processed_data,
+                    'job_id': job_id,
+                    'url': job.get('url', ''),
+                    'company': job.get('company', ''),
+                    'date': job.get('date', '')
                 }
                 
                 qdrant_id = hash(job_title) % 1000000  

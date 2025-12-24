@@ -99,6 +99,7 @@ Respond in the following structured JSON format:
 
 @celery_app.task(name="parse_resume_v2", bind=True, max_retries=3)
 def parse_resume_v2(self, upload_id: str, file_id: str, user_email: str):
+  from utils.upload_status import add_activity_event
   client = None
   try:
     logger.info("Starting parse_resume_v2 for upload_id=%s, file_id=%s, user_email=%s", upload_id, file_id, user_email)
@@ -110,6 +111,7 @@ def parse_resume_v2(self, upload_id: str, file_id: str, user_email: str):
       {"_id": ObjectId(upload_id)},
       {"$set": {"status": "parsing", "updated_at": datetime.utcnow()}},
     )
+    add_activity_event(upload_id, "Parsing Started", "Analyzing your resume content and extracting information", "in_progress")
 
     file_text = _read_pdf_from_gridfs(bucket, file_id)
 
@@ -143,6 +145,7 @@ def parse_resume_v2(self, upload_id: str, file_id: str, user_email: str):
         }
       },
     )
+    add_activity_event(upload_id, "Parsing Completed", "Resume successfully parsed and structured", "completed")
 
     logger.info("parse_resume_v2 success upload_id=%s resume_id=%s", upload_id, resume_id)
 
@@ -167,6 +170,9 @@ def parse_resume_v2(self, upload_id: str, file_id: str, user_email: str):
     return {"status": "parsed", "upload_id": upload_id, "resume_id": str(resume_id)}
 
   except Exception as exc:
+    from utils.funcs import sanitize_error_message
+    from utils.upload_status import add_activity_event
+    sanitized_error = sanitize_error_message(exc)
     if client is not None:
       db = client["jobs_db"]
       uploads = db["resume_uploads"]
@@ -175,11 +181,12 @@ def parse_resume_v2(self, upload_id: str, file_id: str, user_email: str):
         {
           "$set": {
             "status": "parsing_failed",
-            "error_message": str(exc),
+            "error_message": sanitized_error,
             "updated_at": datetime.utcnow(),
           }
         },
       )
+    add_activity_event(upload_id, "Parsing Failed", "Failed to parse your resume", "failed", sanitized_error)
     logger.error("parse_resume_v2 error upload_id=%s err=%s", upload_id, exc)
     raise self.retry(exc=exc, countdown=2 ** self.request.retries) if self.request.retries < self.max_retries else exc
   finally:

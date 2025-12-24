@@ -8,6 +8,7 @@ celery_app = Celery(
         'celery_tasks.recommendation_task',
         'celery_tasks.precompute_embedding',
         'celery_tasks.parse_resume_v2',
+        'celery_tasks.job_ingest',
     ],
 )
 

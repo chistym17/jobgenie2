@@ -68,7 +68,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .bg-brand-primary-soft {
   background-color: color-mix(in srgb, var(--brand-primary) 12%, transparent);
-}
+  }
 .border-brand-primary-soft {
   border-color: color-mix(in srgb, var(--brand-primary) 22%, transparent);
 }

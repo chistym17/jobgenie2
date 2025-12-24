@@ -16,7 +16,8 @@ class JobLLMProcessor:
         if not self.api_key:
             raise ValueError("Missing GOOGLE_API_KEY in environment variables.")
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel("gemini-2.0-flash")
+        model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.0-flash")
+        self.model = genai.GenerativeModel(model_name)
 
     def generate_system_prompt(self, content: str) -> str:
         """Generate a system prompt for Gemini to parse job postings dynamically."""
