@@ -153,6 +153,48 @@ async def increment_retry_count(upload_id: str) -> Tuple[bool, int]:
     return True, int(result.get("retry_count", 0))
 
 
+async def add_activity_event(
+    upload_id: str,
+    step: str,
+    message: str,
+    status: str,
+    error_message: Optional[str] = None,
+) -> bool:
+    """
+    Add an activity event to the timeline.
+    
+    Args:
+        upload_id: Upload document ID
+        step: Step name (e.g., "Resume Uploaded", "Parsing Started")
+        message: Activity message
+        status: Status type ("completed", "in_progress", "failed", "pending")
+        error_message: Optional error message for failed statuses
+    """
+    try:
+        oid = ObjectId(upload_id)
+    except Exception as exc:
+        _logger.error("Invalid upload_id passed to add_activity_event: %s err=%s", upload_id, exc)
+        return False
+
+    activity_event = {
+        "step": step,
+        "message": message,
+        "status": status,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+    if error_message:
+        activity_event["error_message"] = error_message
+
+    result = await _collection.update_one(
+        {"_id": oid},
+        {
+            "$push": {"activity_timeline": activity_event},
+            "$set": {"updated_at": datetime.utcnow()},
+        },
+    )
+    return result.matched_count == 1
+
+
 async def delete_upload(upload_id: str) -> bool:
     try:
         oid = ObjectId(upload_id)

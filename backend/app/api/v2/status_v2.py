@@ -158,6 +158,17 @@ async def list_uploads(
     )
 
 
+@router.get("/upload/{upload_id}/activity")
+async def get_upload_activity(upload_id: str):
+    """Get activity timeline for an upload."""
+    doc = await resume_upload_service.get_upload(upload_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Upload not found")
+
+    activity_timeline = doc.get("activity_timeline", [])
+    return {"upload_id": upload_id, "activity_timeline": activity_timeline}
+
+
 @router.delete("/upload/{upload_id}")
 async def delete_upload(upload_id: str):
     doc = await resume_upload_service.get_upload(upload_id)

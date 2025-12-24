@@ -1,7 +1,8 @@
 from celery_app import celery_app
 from services.recommender_service import RecommenderService
-from utils.upload_status import update_upload_status
+from utils.upload_status import update_upload_status, add_activity_event
 from utils.logger_v2 import get_v2_logger
+from utils.funcs import sanitize_error_message
 from utils.recommendation_storage import (
     check_existing_recommendations,
     save_recommendations,
@@ -54,11 +55,14 @@ def generate_recommendations_task(user_email: str, upload_id: str | None = None,
         
         if upload_id:
             update_upload_status(upload_id, "completed")
+            add_activity_event(upload_id, "Recommendations Ready", "Your personalized job recommendations are ready!", "completed")
             logger.info("Recommendations completed for upload_id=%s user_email=%s", upload_id, user_email)
         return recommendations
     except Exception as e:
         print(f"Error in recommendation task: {e}")
         if upload_id:
-            update_upload_status(upload_id, "failed", error_message=str(e))
+            sanitized_error = sanitize_error_message(e)
+            update_upload_status(upload_id, "failed", error_message=sanitized_error)
+            add_activity_event(upload_id, "Processing Failed", "An error occurred during processing", "failed", sanitized_error)
             logger.error("Recommendations failed for upload_id=%s user_email=%s err=%s", upload_id, user_email, e)
         raise 

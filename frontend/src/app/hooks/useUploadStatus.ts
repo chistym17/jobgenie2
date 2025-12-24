@@ -22,6 +22,7 @@ interface UploadStatusResponse {
 
 export function useUploadStatus(uploadId: string | null, enabled: boolean) {
   const [status, setStatus] = useState<UploadStatusValue | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +48,7 @@ export function useUploadStatus(uploadId: string | null, enabled: boolean) {
         const data: UploadStatusResponse = await res.json();
         if (cancelled) return;
         setStatus(data.status);
+        setErrorMessage(data.error_message || null);
         setError(null);
         if (
           data.status === "parsed" ||
@@ -76,6 +78,7 @@ export function useUploadStatus(uploadId: string | null, enabled: boolean) {
 
   return {
     status,
+    errorMessage,
     isLoading,
     error,
   };

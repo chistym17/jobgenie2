@@ -1,15 +1,19 @@
 'use client';
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import Navbar from "../components/v2/Navbar";
 import ConfirmationModal from "../components/v2/ConfirmationModal";
-import { Upload, Clock, CheckCircle2, AlertTriangle, ArrowUpRight, Bell, Sparkles, X, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Upload, Clock, CheckCircle2, AlertTriangle, ArrowUpRight, Bell, Sparkles, X, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { useUploadHistory } from "../hooks/useUploadHistory";
 import { useUploadStatus } from "../hooks/useUploadStatus";
 import { useResumeDetail } from "../hooks/useResumeDetail";
 import { useDeleteUpload } from "../hooks/useDeleteUpload";
+import { useNotifications } from "../hooks/useNotifications";
+import ToastContainer from "../components/v2/ToastContainer";
+import NotificationItem from "../components/v2/NotificationItem";
+import { useActivityTimeline } from "../hooks/useActivityTimeline";
 
 const statusConfig: Record<
   string,
@@ -59,19 +63,66 @@ const statusConfig: Record<
   },
 };
 
+function ActivityTimelineTab({ focusedUploadId }: { focusedUploadId: string | null }) {
+  const { activities, isLoading } = useActivityTimeline(focusedUploadId);
+
+  return (
+    <div className="min-h-[500px]">
+      <h2 className="text-xl sm:text-2xl font-semibold text-white mb-3">
+        Activity Timeline
+      </h2>
+      <p className="text-sm sm:text-base text-brand-muted mb-8">
+        Track the progress of your resume processing step by step.
+      </p>
+      
+      {!focusedUploadId ? (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-base text-brand-muted min-h-[300px] flex items-center justify-center">
+          No active upload selected. Upload a resume to see progress here.
+        </div>
+      ) : isLoading ? (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-base text-brand-muted min-h-[300px] flex items-center justify-center">
+          Loading activity timeline...
+        </div>
+      ) : activities.length === 0 ? (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-base text-brand-muted min-h-[300px] flex items-center justify-center">
+          Waiting for processing to start...
+        </div>
+      ) : (
+        <div className="space-y-0">
+          {activities.map((activity, index) => (
+            <NotificationItem
+              key={`${activity.step}-${activity.timestamp}-${index}`}
+              step={activity.step}
+              message={activity.message}
+              status={activity.status}
+              timestamp={activity.timestamp}
+              isLast={index === activities.length - 1}
+              errorMessage={activity.error_message}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ResumeUploadsDashboard() {
   const [activeTab, setActiveTab] = useState<"history" | "new" | "recommendations" | "notifications">("history");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const searchParams = useSearchParams();
   const focusedUploadId = searchParams.get("upload_id");
   const { user } = useCurrentUser();
   const userEmail = user?.email || null;
   const { items: historyItems, isLoading: isHistoryLoading, refetch: refetchHistory } = useUploadHistory(userEmail);
-  const { status: focusedStatus } = useUploadStatus(focusedUploadId, !!focusedUploadId);
+  const { status: focusedStatus, errorMessage: focusedErrorMessage } = useUploadStatus(focusedUploadId, !!focusedUploadId);
   const [detailUploadId, setDetailUploadId] = useState<string | null>(null);
   const { data: detail, isLoading: isDetailLoading } = useResumeDetail(detailUploadId);
   const { deleteUpload, isDeleting } = useDeleteUpload();
   const [deleteConfirmUploadId, setDeleteConfirmUploadId] = useState<string | null>(null);
+  const { notifications, toasts, removeToast } = useNotifications(focusedUploadId, focusedStatus, focusedErrorMessage);
+
+  const ITEMS_PER_PAGE = 3;
 
   const uploadsToShow = useMemo(() => {
     if (!historyItems.length && !focusedUploadId) return [];
@@ -80,6 +131,17 @@ export default function ResumeUploadsDashboard() {
     if (existing) return historyItems;
     return historyItems;
   }, [historyItems, focusedUploadId]);
+
+  const totalPages = Math.ceil(uploadsToShow.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedUploads = uploadsToShow.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
 
   const handleDelete = async (uploadId: string) => {
     const success = await deleteUpload(uploadId);
@@ -219,7 +281,7 @@ export default function ResumeUploadsDashboard() {
                       </div>
                     )}
 
-                    {!isHistoryLoading && uploadsToShow.map((upload) => {
+                    {!isHistoryLoading && paginatedUploads.map((upload) => {
                       const isFocused = focusedUploadId === upload.upload_id;
                       const effectiveStatus =
                         isFocused && focusedStatus ? focusedStatus : upload.status;
@@ -228,45 +290,45 @@ export default function ResumeUploadsDashboard() {
                       return (
                         <div
                           key={upload.upload_id}
-                          className={`flex items-center justify-between gap-4 rounded-2xl px-4 py-4 sm:px-5 sm:py-4 hover:bg-white/[0.03] transition-colors ${
+                          className={`flex items-center justify-between gap-4 rounded-2xl px-5 py-4 hover:bg-white/[0.03] transition-colors ${
                             isFocused ? "border border-brand-primary-soft bg-brand-primary-soft/10" : ""
                           }`}
                         >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="h-8 w-8 rounded-full bg-brand-primary-soft flex items-center justify-center flex-shrink-0">
-                              <Upload className="h-4 w-4 text-brand-primary" />
+                          <div className="flex items-center gap-4 min-w-0 flex-1">
+                            <div className="h-10 w-10 rounded-full bg-brand-primary-soft flex items-center justify-center flex-shrink-0">
+                              <Upload className="h-5 w-5 text-brand-primary" />
                             </div>
-                            <div className="min-w-0">
-                              <p className="text-sm sm:text-base text-white truncate">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-base font-medium text-white truncate">
                                 {upload.file_name}
                               </p>
-                              <p className="text-xs text-brand-muted">
+                              <p className="text-sm text-brand-muted">
                                 Uploaded {(upload.created_at || "").slice(0, 10)}
                               </p>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="flex items-center gap-3 flex-shrink-0">
                             <span
-                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] sm:text-xs font-medium ${cfg.className}`}
+                              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${cfg.className}`}
                             >
                               {cfg.icon}
                               <span>{cfg.label}</span>
                             </span>
                             <button
                               onClick={() => setDetailUploadId(upload.upload_id)}
-                              className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border border-white/10 text-brand-muted hover:text-brand-ink hover:bg-brand-primary transition-colors"
+                              className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full border border-white/10 text-brand-muted hover:text-brand-ink hover:bg-brand-primary transition-colors"
                             >
                               View
-                              <ArrowUpRight className="h-3.5 w-3.5" />
+                              <ArrowUpRight className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => setDeleteConfirmUploadId(upload.upload_id)}
                               disabled={isDeleting}
-                              className="inline-flex items-center justify-center p-1.5 rounded-full border border-red-500/40 text-red-300 hover:text-white hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="inline-flex items-center justify-center p-2 rounded-full border border-red-500/40 text-red-300 hover:text-white hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Delete upload"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
                         </div>
@@ -276,6 +338,78 @@ export default function ResumeUploadsDashboard() {
                     {!isHistoryLoading && uploadsToShow.length === 0 && (
                       <div className="py-10 text-center text-sm text-brand-muted">
                         No uploads yet. Start by uploading your first resume.
+                      </div>
+                    )}
+
+                    {!isHistoryLoading && uploadsToShow.length > 0 && totalPages > 1 && (
+                      <div className="flex items-center justify-between pt-6 mt-6 border-t border-white/10">
+                        <div className="text-xs text-brand-muted">
+                          Showing {startIndex + 1}-{Math.min(endIndex, uploadsToShow.length)} of {uploadsToShow.length}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setCurrentPage(1)}
+                            disabled={currentPage === 1}
+                            className="p-1.5 rounded-lg border border-white/10 text-brand-muted hover:text-white hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="First page"
+                          >
+                            <ChevronsLeft className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                            className="p-1.5 rounded-lg border border-white/10 text-brand-muted hover:text-white hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="Previous page"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </button>
+                          <div className="flex items-center gap-1.5 px-2">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                              if (
+                                page === 1 ||
+                                page === totalPages ||
+                                (page >= currentPage - 1 && page <= currentPage + 1)
+                              ) {
+                                return (
+                                  <button
+                                    key={page}
+                                    onClick={() => setCurrentPage(page)}
+                                    className={`min-w-[32px] px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                      currentPage === page
+                                        ? "bg-brand-primary text-brand-ink"
+                                        : "text-brand-muted hover:text-white hover:bg-white/5"
+                                    }`}
+                                  >
+                                    {page}
+                                  </button>
+                                );
+                              } else if (page === currentPage - 2 || page === currentPage + 2) {
+                                return (
+                                  <span key={page} className="text-brand-muted px-1">
+                                    ...
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })}
+                          </div>
+                          <button
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            disabled={currentPage === totalPages}
+                            className="p-1.5 rounded-lg border border-white/10 text-brand-muted hover:text-white hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="Next page"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => setCurrentPage(totalPages)}
+                            disabled={currentPage === totalPages}
+                            className="p-1.5 rounded-lg border border-white/10 text-brand-muted hover:text-white hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="Last page"
+                          >
+                            <ChevronsRight className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -368,23 +502,15 @@ export default function ResumeUploadsDashboard() {
               )}
 
               {activeTab === "notifications" && (
-                <div className="min-h-[500px]">
-                  <h2 className="text-xl sm:text-2xl font-semibold text-white mb-3">
-                    Notifications
-                  </h2>
-                  <p className="text-sm sm:text-base text-brand-muted mb-8">
-                    Track important events like completed analyses, new recommendations, and system alerts.
-                  </p>
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-base text-brand-muted min-h-[300px] flex items-center justify-center">
-                    No notifications yet. You will see updates here as you start using your workspace.
-                  </div>
-                </div>
+                <ActivityTimelineTab focusedUploadId={focusedUploadId} />
               )}
               </div>
             </div>
           </div>
         </main>
       </div>
+
+      <ToastContainer toasts={toasts} onClose={removeToast} />
 
       <ConfirmationModal
         isOpen={!!deleteConfirmUploadId}
