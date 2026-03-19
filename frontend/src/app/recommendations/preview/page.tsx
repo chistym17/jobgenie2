@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Briefcase, GraduationCap, Link2, MapPin, Sparkles, Star } from "lucide-react";
+import { Briefcase, Link2, Sparkles } from "lucide-react";
 import Navbar from "../../components/v2/Navbar";
 import { useSearchParams } from "next/navigation";
 
@@ -15,8 +15,9 @@ type Recommendation = {
   matchScore: number;
   directLink?: string;
   stack: string[];
-  highlights: string[];
-  requirements: string[];
+  description: string;
+  keyRequirements: string;
+  keyRequirementItems: string[];
 };
 
 const fallbackRecommendations: Recommendation[] = [
@@ -30,15 +31,14 @@ const fallbackRecommendations: Recommendation[] = [
     matchScore: 96,
     directLink: "https://example.com/apply-aurora",
     stack: ["React", "TypeScript", "Next.js", "Design Systems"],
-    highlights: [
+    description:
+      "Partner directly with clients to understand business objectives, translate ambiguous problems into technical requirements, and deliver production-ready AI and data workflows end to end.",
+    keyRequirements:
+      "Strong component architecture and TypeScript proficiency, Experience shipping user-facing performance improvements, “design-to-dev” workflow collaboration",
+    keyRequirementItems: [
       "Strong component architecture and TypeScript proficiency",
       "Experience shipping user-facing performance improvements",
-      "You match the “design-to-dev” workflow the team uses",
-    ],
-    requirements: [
-      "5+ years building production React applications",
-      "Deep TypeScript and state management",
-      "Accessibility-first UI engineering",
+      "“design-to-dev” workflow collaboration",
     ],
   },
   {
@@ -51,12 +51,11 @@ const fallbackRecommendations: Recommendation[] = [
     matchScore: 91,
     directLink: "https://example.com/apply-nebula",
     stack: ["Node.js", "Postgres", "React", "API Design"],
-    highlights: [
-      "Your experience aligns with their API-first product approach",
-      "You match ownership expectations across the stack",
-      "Strong fit for reliability and observability practices",
-    ],
-    requirements: [
+    description:
+      "Design and build secure, scalable REST APIs, work across the stack with React and Node.js, and improve reliability through observability and continuous delivery.",
+    keyRequirements:
+      "API design and database modeling experience, React + Node.js in production, Ability to debug distributed issues",
+    keyRequirementItems: [
       "API design and database modeling experience",
       "React + Node.js in production",
       "Ability to debug distributed issues",
@@ -72,15 +71,14 @@ const fallbackRecommendations: Recommendation[] = [
     matchScore: 87,
     directLink: "https://example.com/apply-solstice",
     stack: ["A/B Testing", "React", "Analytics", "Performance"],
-    highlights: [
-      "Great match for experimentation and analytics-driven shipping",
-      "Your performance background supports faster page experiences",
-      "You align with rapid iteration culture",
-    ],
-    requirements: [
+    description:
+      "Build and iterate on experimentation-driven features, improve UX performance, and ship analytics-based improvements with fast feedback loops.",
+    keyRequirements:
+      "Experience with experimentation frameworks, Strong UX + performance fundamentals, Collaborative product/design mindset",
+    keyRequirementItems: [
       "Experience with experimentation frameworks",
       "Strong UX + performance fundamentals",
-      "Collaborative mindset with product and design",
+      "Collaborative product/design mindset",
     ],
   },
 ];
@@ -127,13 +125,14 @@ export default function RecommendationsPreviewPage() {
   const [selectedId, setSelectedId] = useState<string>(
     uploadId ? "" : fallbackRecommendations[0]?.id || ""
   );
+  const JOBS_PER_PAGE = 3;
+  const [page, setPage] = useState(1);
 
   const selected = useMemo(() => {
     return recommendations.find((r) => r.id === selectedId) || recommendations[0];
   }, [recommendations, selectedId]);
 
-  const [assistantOpen, setAssistantOpen] = useState(false);
-  const [agentAction, setAgentAction] = useState<"fit" | "improve" | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     if (!recommendations.length) return;
@@ -142,27 +141,47 @@ export default function RecommendationsPreviewPage() {
     }
   }, [recommendations, selectedId]);
 
-  const agentResponse = useMemo(() => {
-    if (!selected || !agentAction) return null;
+  useEffect(() => {
+    setPage(1);
+  }, [uploadId]);
 
-    if (agentAction === "fit") {
-      return {
-        title: "Why it’s a strong match",
-        lines: selected.highlights.slice(0, 3),
-      };
-    }
+  const totalPages = Math.max(
+    1,
+    Math.ceil((recommendations?.length || 0) / JOBS_PER_PAGE)
+  );
 
-    return {
-      title: "How to strengthen your application",
-      lines: [
-        `Add 1 bullet that quantifies your impact with ${selected.stack[0] || "your stack"}`,
-        "Mirror 2–3 keywords from the job’s requirements into your experience section",
-        "Prepare one story for a project where you owned the full delivery cycle",
-      ],
-    };
-  }, [agentAction, selected]);
+  const paginated = useMemo(() => {
+    const start = (page - 1) * JOBS_PER_PAGE;
+    return recommendations.slice(start, start + JOBS_PER_PAGE);
+  }, [recommendations, page]);
 
   const normalizeRecommendations = (raw: any[]): Recommendation[] => {
+    const splitKeyRequirements = (text: string): string[] => {
+      const t = (text || "").trim();
+      if (!t) return [];
+      const parts = t
+        .split(/[\n;]/g)
+        .flatMap((x) => x.split(","))
+        .map((x) => x.trim())
+        .filter(Boolean);
+      return parts.slice(0, 10);
+    };
+
+    const normalizeStack = (stackRaw: any): string[] => {
+      if (!stackRaw) return [];
+      if (Array.isArray(stackRaw)) return stackRaw.map((x) => String(x)).filter(Boolean);
+      if (typeof stackRaw === "string") {
+        const t = stackRaw.trim();
+        if (!t) return [];
+        return t
+          .split(/[,/|]/g)
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .slice(0, 10);
+      }
+      return [];
+    };
+
     return raw
       .filter(Boolean)
       .map((item, idx) => {
@@ -181,23 +200,14 @@ export default function RecommendationsPreviewPage() {
 
         const directLink = item["Direct Link"] ?? item.directLink ?? undefined;
 
-        const stackRaw = item["Stack"] ?? item.stack ?? item["Bonus Skills"] ?? [];
-        const stack = Array.isArray(stackRaw) ? stackRaw.map((x: any) => String(x)) : [];
+        const stack = normalizeStack(
+          item["Stack"] ?? item.stack ?? item["Bonus Skills"] ?? ""
+        );
 
-        const highlightsRaw =
-          item["Key Requirements"] ??
-          item["Bonus Skills"] ??
-          item.highlights ??
-          item["Highlights"] ??
-          [];
-        const highlights = Array.isArray(highlightsRaw) ? highlightsRaw.map((x: any) => String(x)) : [];
-
-        const requirementsRaw =
-          item.requirements ??
-          item["Requirements"] ??
-          item["Key Requirements"] ??
-          highlights;
-        const requirements = Array.isArray(requirementsRaw) ? requirementsRaw.map((x: any) => String(x)) : [];
+        const description = item["Description"] ?? item.description ?? "";
+        const keyRequirements =
+          item["Key Requirements"] ?? item.keyRequirements ?? "";
+        const keyRequirementItems = splitKeyRequirements(String(keyRequirements));
 
         return {
           id: item.id ?? item._id ?? `rec-${idx}`,
@@ -209,8 +219,9 @@ export default function RecommendationsPreviewPage() {
           matchScore,
           directLink: directLink ? String(directLink) : undefined,
           stack,
-          highlights,
-          requirements,
+          description: String(description || ""),
+          keyRequirements: String(keyRequirements || ""),
+          keyRequirementItems,
         };
       });
   };
@@ -231,8 +242,7 @@ export default function RecommendationsPreviewPage() {
             if (!cancelled) {
               setRecommendations(normalized);
               setSelectedId(normalized[0]?.id || "");
-              setAssistantOpen(false);
-              setAgentAction(null);
+              setModalOpen(false);
             }
             return;
           }
@@ -253,8 +263,7 @@ export default function RecommendationsPreviewPage() {
         if (!cancelled) {
           setRecommendations(normalized);
           setSelectedId(normalized[0]?.id || "");
-          setAssistantOpen(false);
-          setAgentAction(null);
+          setModalOpen(false);
         }
       } catch {
       }
@@ -285,13 +294,12 @@ export default function RecommendationsPreviewPage() {
                   </h1>
                 </div>
                 <p className="text-brand-muted mt-3 max-w-2xl">
-                  Modern layout: pick a role to see a tailored fit summary and next steps.
+                  pick a role to see a tailored fit summary and next steps.
                 </p>
               </div>
 
               <div className="flex gap-2">
                 <Pill>
-                  <Star className="text-brand-secondary" size={14} />
                   {uploadId ? (recommendations.length ? `${recommendations.length} matches` : "Loading") : `${recommendations.length} matches`}
                 </Pill>
                 <Pill>
@@ -303,7 +311,7 @@ export default function RecommendationsPreviewPage() {
           </header>
 
           <div className="grid lg:grid-cols-12 gap-6 items-start">
-            <section className={assistantOpen ? "lg:col-span-8 space-y-4" : "lg:col-span-12 space-y-4"}>
+            <section className="lg:col-span-12 space-y-4">
               <div className="glass-panel rounded-3xl border border-white/10 p-4 sm:p-6">
                 <div className="flex items-center justify-between gap-4 mb-4">
                   <div>
@@ -311,7 +319,7 @@ export default function RecommendationsPreviewPage() {
                       Recommended roles
                     </h2>
                     <p className="text-brand-muted text-sm mt-1">
-                      Click a card to open the assistant and see guidance.
+                      Use "See details" to view the full description and guidance.
                     </p>
                   </div>
                 </div>
@@ -322,17 +330,11 @@ export default function RecommendationsPreviewPage() {
                       Loading recommendations...
                     </div>
                   ) : (
-                    recommendations.map((rec) => {
+                    paginated.map((rec) => {
                       const isSelected = rec.id === selected.id;
                       return (
-                        <button
+                        <div
                           key={rec.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedId(rec.id);
-                            setAssistantOpen(true);
-                            setAgentAction("fit");
-                          }}
                           className={`w-full text-left rounded-2xl border transition-all ${
                             isSelected
                               ? "border-brand-primary-soft bg-brand-primary-soft/10"
@@ -349,144 +351,148 @@ export default function RecommendationsPreviewPage() {
                                   <div className="text-brand-muted text-sm mt-1 truncate">
                                     {rec.companyName}
                                   </div>
-                                </div>
-
-                                <div className="flex-shrink-0">
-                                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs border border-white/10 bg-white/5 text-brand-muted">
-                                    <Star size={14} className="text-brand-secondary" />
-                                    {rec.matchScore}% match
-                                  </div>
+                                  {rec.location && (
+                                    <div className="text-brand-muted text-sm mt-1 truncate">
+                                      {rec.location}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
 
-                              <div className="flex flex-wrap gap-2 mt-3">
-                                <Pill className="bg-white/5 text-brand-muted border-white/10">
-                                  <MapPin size={14} />
-                                  {rec.location}
-                                </Pill>
-                                <Pill className="bg-white/5 text-brand-muted border-white/10">
-                                  <Briefcase size={14} />
-                                  {rec.jobType}
-                                </Pill>
-                                <Pill className="bg-white/5 text-brand-muted border-white/10">
-                                  <GraduationCap size={14} />
-                                  {rec.salary}
-                                </Pill>
-                              </div>
-
-                              <div className="flex flex-wrap gap-2 mt-3">
-                                {rec.stack.slice(0, 4).map((s) => (
-                                  <span
-                                    key={s}
-                                    className="px-3 py-1 rounded-full text-xs border border-white/10 bg-white/[0.03] text-brand-muted"
-                                  >
-                                    {s}
-                                  </span>
-                                ))}
-                              </div>
+                              
                             </div>
 
                             <div className="flex items-center gap-2 justify-end">
-                              {rec.directLink ? (
-                                <a
-                                  href={rec.directLink}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-brand-text hover:bg-white/10 transition-colors"
-                                >
-                                  <Link2 size={16} />
-                                  Apply
-                                </a>
-                              ) : (
-                                <span className="inline-flex items-center justify-center px-4 py-2 rounded-xl text-sm border border-white/10 bg-white/5 text-brand-muted">
-                                  No link
-                                </span>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedId(rec.id);
+                                  setModalOpen(true);
+                                }}
+                                className="px-4 py-2 rounded-xl text-sm font-semibold bg-white text-black hover:bg-white/90 transition-colors"
+                              >
+                                See details
+                              </button>
                             </div>
                           </div>
-                        </button>
+                        </div>
                       );
                     })
                   )}
                 </div>
+
+                {recommendations.length > JOBS_PER_PAGE && (
+                  <div className="flex items-center justify-between gap-3 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="px-4 py-2 rounded-xl text-sm font-medium border border-white/10 bg-white/[0.02] text-brand-muted hover:bg-white/[0.04] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Previous
+                    </button>
+                    <div className="text-xs text-brand-muted">
+                      Page {page} of {totalPages}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      className="px-4 py-2 rounded-xl text-sm font-medium border border-white/10 bg-white/[0.02] text-brand-muted hover:bg-white/[0.04] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
               </div>
             </section>
 
-            {assistantOpen && (
-              <aside className="lg:col-span-4 space-y-4">
-                <div className="sticky top-24 space-y-4">
-                  <AgentPanel
-                    title="Genie Assistant"
-                    subtitle="Pick a mode for this role"
-                    icon={<Sparkles className="text-brand-primary" size={20} />}
-                  >
-                    <div className="flex items-start justify-between gap-3 mb-4">
-                      <div>
-                        <div className="text-white font-semibold">Selected role</div>
-                        <div className="text-brand-muted text-sm mt-1">
-                          {selected.jobTitle} · {selected.companyName}
-                        </div>
+            {modalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div
+                  className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                  onClick={() => {
+                    setModalOpen(false);
+                  }}
+                />
+                <div className="relative w-full max-w-3xl glass-panel rounded-3xl border border-white/10 overflow-hidden">
+                  <div className="p-6 border-b border-white/10 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-white font-semibold text-xl truncate">
+                        {selected.jobTitle}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAssistantOpen(false);
-                          setAgentAction(null);
-                        }}
-                        className="px-3 py-2 rounded-xl text-sm font-medium border border-white/10 bg-white/[0.03] text-brand-muted hover:bg-white/[0.06] transition-colors"
-                      >
-                        Hide
-                      </button>
+                      <div className="text-brand-muted text-sm mt-1 truncate">
+                        {selected.companyName}
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModalOpen(false);
+                      }}
+                      className="px-3 py-2 rounded-xl text-sm font-medium border border-white/10 bg-white/[0.03] text-brand-muted hover:bg-white/[0.06] transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
 
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setAgentAction("fit")}
-                        className={`flex-1 min-w-[140px] px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
-                          agentAction === "fit"
-                            ? "border-brand-primary-soft bg-brand-primary-soft/15 text-white"
-                            : "border-white/10 bg-white/[0.03] text-brand-muted hover:bg-white/[0.06]"
-                        }`}
-                      >
-                        Explain why it fits
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAgentAction("improve")}
-                        className={`flex-1 min-w-[140px] px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
-                          agentAction === "improve"
-                            ? "border-brand-primary-soft bg-brand-primary-soft/15 text-white"
-                            : "border-white/10 bg-white/[0.03] text-brand-muted hover:bg-white/[0.06]"
-                        }`}
-                      >
-                        How to improve
-                      </button>
-                    </div>
-
-                    {agentResponse ? (
-                      <div className="mt-4">
-                        <div className="text-white font-semibold">{agentResponse.title}</div>
+                  <div className="p-6 overflow-y-auto max-h-[80vh] space-y-5">
+                    <div>
+                      <div className="text-white/90 text-xs font-semibold tracking-wide uppercase">
+                        Key requirements
+                      </div>
+                      {selected.keyRequirementItems.length ? (
                         <div className="mt-2 space-y-2">
-                          {agentResponse.lines.map((line) => (
+                          {selected.keyRequirementItems.slice(0, 8).map((line) => (
                             <div
                               key={line}
                               className="flex items-start gap-3 text-brand-muted text-sm"
                             >
-                              <span className="mt-1 h-2 w-2 rounded-full bg-brand-secondary" />
+                              <span className="mt-2 h-2 w-2 rounded-full bg-brand-secondary" />
                               <span>{line}</span>
                             </div>
                           ))}
                         </div>
+                      ) : (
+                        <div className="mt-2 text-brand-muted text-sm">
+                          No key requirements available.
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="text-white/90 text-xs font-semibold tracking-wide uppercase">
+                        Description
                       </div>
-                    ) : (
-                      <div className="mt-4 text-brand-muted text-sm">
-                        Select a mode to see guidance for this role.
+                      <div className="mt-2 text-brand-muted text-sm leading-relaxed whitespace-pre-line">
+                        {selected.description}
                       </div>
-                    )}
-                  </AgentPanel>
+                    </div>
+
+                    <div>
+                      {selected.directLink ? (
+                        <a
+                          href={selected.directLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl text-base font-semibold bg-white text-black hover:bg-white/90 transition-colors mt-1"
+                        >
+                          <Link2 size={18} />
+                          Apply
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled
+                          className="w-full px-6 py-4 rounded-2xl text-base font-semibold bg-white/10 text-brand-muted cursor-not-allowed mt-1"
+                        >
+                          Apply
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </aside>
+              </div>
             )}
           </div>
         </div>
