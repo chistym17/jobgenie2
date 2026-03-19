@@ -76,19 +76,43 @@ export default function NotificationItem({
               <p className={`text-base font-medium mb-1.5 ${config.text}`}>{step}</p>
               <p className="text-sm text-brand-muted">{message}</p>
               {errorMessage && status === 'failed' && (
-                <div className="mt-2 p-2.5 rounded-lg bg-red-500/10 border border-red-500/30">
-                  <p className="text-sm text-red-300 font-medium mb-1">Error:</p>
-                  <p className="text-sm text-red-300/80 break-words">
+                <div className="mt-1.5 p-1.5 rounded-md bg-red-500/10 border border-red-500/30">
+                  <p className="text-xs text-red-300 font-medium mb-0.5">Error:</p>
+                  <p className="text-xs text-red-300/80 break-words">
                     {errorMessage.length > 150 ? `${errorMessage.substring(0, 150)}...` : errorMessage}
                   </p>
-                  <p className="text-sm text-red-300/60 mt-2 italic">
+                  <p className="text-xs text-red-300/60 mt-1 italic">
                     Please try uploading again or contact support if the issue persists.
                   </p>
                 </div>
               )}
             </div>
             {timestamp && (
-              <span className="text-sm text-brand-muted whitespace-nowrap">{timestamp}</span>
+              <span className="text-sm text-brand-muted whitespace-nowrap">
+                {(() => {
+                  try {
+                    const date = new Date(timestamp);
+                    return date.toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric',
+                      year: 'numeric'
+                    });
+                  } catch {
+                    // If timestamp is already formatted, try to extract just the date part
+                    const dateMatch = timestamp.match(/(\d{4}-\d{2}-\d{2})/);
+                    if (dateMatch) {
+                      const date = new Date(dateMatch[1]);
+                      return date.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric',
+                        year: 'numeric'
+                      });
+                    }
+                    // Fallback: remove time part if present
+                    return timestamp.split('T')[0] || timestamp.split(' ')[0] || timestamp;
+                  }
+                })()}
+              </span>
             )}
           </div>
         </div>

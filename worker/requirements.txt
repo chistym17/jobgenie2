@@ -5,6 +5,7 @@ qdrant-client
 python-dotenv
 requests
 pymongo
+openai
 playwright==1.40.0
 fake-useragent
 firecrawl-py

@@ -1,8 +1,8 @@
 import json
 import re
-from services.base_gemini_service import BaseGeminiService
 from services.prompts import get_recommendation_prompt
 from fetch_recommendations import fetch_recommendations
+from utils.groq_client import get_groq_client
 
 try:
     import json_repair
@@ -10,7 +10,7 @@ try:
 except ImportError:
     HAS_JSON_REPAIR = False
 
-class RecommenderService(BaseGeminiService):
+class RecommenderService:
     def _extract_json_from_response(self, response_text: str) -> str:
         response_text = response_text.strip()
         
@@ -69,12 +69,25 @@ class RecommenderService(BaseGeminiService):
         if not job_data_list:
             return []
         
-        prompt = get_recommendation_prompt(job_data_list[:20])
+        try:
+            max_jobs = int(__import__("os").getenv("RECOMMENDER_MAX_JOBS", "10"))
+        except Exception:
+            max_jobs = 10
+        max_jobs = max(1, min(30, max_jobs))
+
+        prompt = get_recommendation_prompt(job_data_list[:max_jobs])
 
         try:
-            response = self.model.generate_content(prompt)
-            
-            response_text = response.text.strip()
+            client = get_groq_client()
+            model_name = __import__("os").getenv("GROQ_MODEL_NAME", "llama3-8b-8192")
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1400,
+                temperature=0.2,
+            )
+
+            response_text = (response.choices[0].message.content or "").strip()
             json_str = self._extract_json_from_response(response_text)
             recommendations = self._parse_json_safely(json_str)
             
@@ -85,6 +98,6 @@ class RecommenderService(BaseGeminiService):
             
         except Exception as e:
             print(f"[RECOMMENDER_SERVICE] Error generating recommendations: {e}")
-            print(f"[RECOMMENDER_SERVICE] Response text (first 500 chars): {response.text[:500] if 'response' in locals() else 'N/A'}")
+            print(f"[RECOMMENDER_SERVICE] Response text (first 500 chars): {response_text[:500] if 'response_text' in locals() else 'N/A'}")
             raise ValueError(f"Failed to generate recommendations: {e}")
 
