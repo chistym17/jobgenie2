@@ -73,15 +73,36 @@ def fetch_recommendations(user_email: str):
     for result in fetched_results:
         payload = result.payload if hasattr(result, 'payload') else {}
         job_id = payload.get('job_id', '')
-        job_text = payload.get('content', '') or payload.get('title', '')
+        content = payload.get('content', None)
+        if isinstance(content, dict):
+            title = content.get("title") or payload.get("title") or ""
+            company = content.get("company") or payload.get("company") or ""
+            location = content.get("location") or ""
+            description = content.get("description") or ""
+            requirements = content.get("requirements") or content.get("requirement") or []
+            if isinstance(requirements, list):
+                req_text = "; ".join([str(x) for x in requirements[:8] if x])
+            else:
+                req_text = str(requirements)
+            summary = f"{title}\n{company}\n{location}\n{req_text}\n{description}"
+        else:
+            title = payload.get("title", "")
+            company = payload.get("company", "")
+            location = payload.get("location", "")
+            summary = str(content or payload.get('title', '') or "")
+
+        summary = re.sub(r"\s+", " ", summary).strip()
+        if len(summary) > 1200:
+            summary = summary[:1199] + "…"
         
-        if job_id and job_text:
+        if job_id and summary:
             job_data_with_ids.append({
                 'job_id': job_id,
-                'text': job_text,
-                'title': payload.get('title', ''),
+                'summary': summary,
+                'title': title or payload.get('title', ''),
                 'url': payload.get('url', ''),
-                'company': payload.get('company', ''),
+                'company': company or payload.get('company', ''),
+                'location': location,
                 'date': payload.get('date', '')
             })
     

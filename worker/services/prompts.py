@@ -1,18 +1,36 @@
 def get_recommendation_prompt(jobs_data: list) -> str:
-    jobs_text_parts = []
+    import json
+
+    def _truncate(value: str, limit: int) -> str:
+        if not value:
+            return ""
+        value = str(value).strip()
+        if len(value) <= limit:
+            return value
+        return value[: max(0, limit - 1)] + "…"
+
+    compact_jobs = []
     for job_data in jobs_data:
-        job_id = job_data.get('job_id', '')
-        job_text = job_data.get('text', '')
-        jobs_text_parts.append(f"Job ID: {job_id}\n{job_text}")
-    
-    jobs_text = "\n\n---\n\n".join(jobs_text_parts)
-    
+        compact_jobs.append(
+            {
+                "job_id": str(job_data.get("job_id", "")).strip(),
+                "title": _truncate(job_data.get("title", ""), 120),
+                "company": _truncate(job_data.get("company", ""), 120),
+                "location": _truncate(job_data.get("location", ""), 120),
+                "date": _truncate(job_data.get("date", ""), 40),
+                "url": _truncate(job_data.get("url", ""), 300),
+                "summary": _truncate(job_data.get("summary", ""), 900),
+            }
+        )
+
+    jobs_json = json.dumps(compact_jobs, ensure_ascii=False)
+
     return f"""You are a job recommendation formatter. Transform the following job listings into a structured JSON array.
 
 Job Listings:
-{jobs_text}
+{jobs_json}
 
-Transform each job into a JSON object with these fields:
+For each job, create ONE JSON object with these fields:
 - Job ID (REQUIRED - preserve the exact Job ID from the source)
 - Job Title
 - Company Name
@@ -24,10 +42,12 @@ Transform each job into a JSON object with these fields:
 - Key Requirements
 - Bonus Skills
 - Stack
-- Description
-- How to Apply
+- Description (keep concise)
+- How to Apply (keep concise)
 - Direct Link
 - Match Score (as a percentage, e.g., 55 for 55%)
+
+Return the TOP 5 best matches only.
 
 CRITICAL JSON FORMATTING RULES:
 1. Return ONLY a valid JSON array - no markdown, no explanations, no text before or after

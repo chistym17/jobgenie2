@@ -69,7 +69,13 @@ class RecommenderService(BaseGeminiService):
         if not job_data_list:
             return []
         
-        prompt = get_recommendation_prompt(job_data_list[:20])
+        try:
+            max_jobs = int(__import__("os").getenv("RECOMMENDER_MAX_JOBS", "10"))
+        except Exception:
+            max_jobs = 10
+        max_jobs = max(1, min(30, max_jobs))
+
+        prompt = get_recommendation_prompt(job_data_list[:max_jobs])
 
         try:
             response = self.model.generate_content(prompt)
