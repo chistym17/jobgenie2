@@ -27,6 +27,45 @@ def _get_db_and_bucket():
   return client, db, bucket
 
 
+def _clean_resume_text(text: str) -> str:
+  if not text:
+    return ""
+
+  text = text.replace("\x00", " ")
+  text = re.sub(r"[ \t]+\n", "\n", text)
+  text = re.sub(r"\n{3,}", "\n\n", text)
+  text = re.sub(r"[ \t]{2,}", " ", text)
+  lines = [ln.strip() for ln in text.splitlines()]
+
+  seen = set()
+  deduped_lines = []
+  for ln in lines:
+    if not ln:
+      deduped_lines.append("")
+      continue
+    key = ln.lower()
+    if len(ln) > 6 and key in seen:
+      continue
+    seen.add(key)
+    deduped_lines.append(ln)
+
+  text = "\n".join(deduped_lines)
+  text = re.sub(r"\n{3,}", "\n\n", text).strip()
+
+  try:
+    max_chars = int(os.getenv("RESUME_PARSE_MAX_CHARS", "16000"))
+  except Exception:
+    max_chars = 16000
+  max_chars = max(2000, min(80000, max_chars))
+
+  if len(text) <= max_chars:
+    return text
+
+  head = int(max_chars * 0.7)
+  tail = max_chars - head
+  return (text[:head].rstrip() + "\n\n…\n\n" + text[-tail:].lstrip()).strip()
+
+
 def _read_pdf_from_gridfs(bucket: GridFSBucket, file_id: str) -> str:
   oid = ObjectId(file_id)
   grid_out = bucket.open_download_stream(oid)
@@ -114,6 +153,7 @@ def parse_resume_v2(self, upload_id: str, file_id: str, user_email: str):
     add_activity_event(upload_id, "Parsing Started", "Analyzing your resume content and extracting information", "in_progress")
 
     file_text = _read_pdf_from_gridfs(bucket, file_id)
+    file_text = _clean_resume_text(file_text)
 
     resume_data = _call_gemini(file_text)
 
