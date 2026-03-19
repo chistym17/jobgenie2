@@ -9,12 +9,12 @@ from datetime import datetime
 from bson import ObjectId
 from celery_app import celery_app
 from db import get_mongodb_client
-from google import genai
 from gridfs import GridFSBucket
 import PyPDF2
 
 from celery_tasks.precompute_embedding import precompute_resume_embedding_task
 from utils.logger_v2 import get_v2_logger
+from utils.groq_client import get_groq_client
 
 
 logger = get_v2_logger("resume_v2.worker.parse")
@@ -78,15 +78,10 @@ def _read_pdf_from_gridfs(bucket: GridFSBucket, file_id: str) -> str:
 
 
 def _call_gemini(file_text: str) -> dict:
-  api_key = os.getenv("GOOGLE_API_KEY")
-  if not api_key:
-    raise ValueError("Missing GOOGLE_API_KEY for Gemini")
+  client = get_groq_client()
+  model_name = os.getenv("GROQ_MODEL_NAME", "llama3-8b-8192")
 
-  client = genai.Client(api_key=api_key)
-  model_name_raw = os.getenv("GEMINI_MODEL_NAME", "gemini-2.0-flash")
-  model_name = model_name_raw.lower().replace(" ", "-").strip()
-
-  prompt = f"""You are a professional resume parser. Please analyze the following resume text and extract the relevant information:
+  prompt = f"""You are a professional resume parser. Please analyze the following resume text and extract the relevant information.
 
 Resume Text:
 {file_text}
@@ -101,7 +96,7 @@ Extract the following fields:
 - Certifications (if any)
 - Job Preferences (location, remote/on-site, role, etc.)
 
-Respond in the following structured JSON format:
+Return ONLY valid JSON (no markdown, no explanation) in the following format:
 {{
   'name': '',
   'contact': {{
@@ -116,13 +111,15 @@ Respond in the following structured JSON format:
 }}
 """
 
-  response = client.models.generate_content(
+  response = client.chat.completions.create(
     model=model_name,
-    contents=[prompt],
+    messages=[{"role": "user", "content": prompt}],
+    max_tokens=1200,
+    temperature=0.2,
   )
 
-  response_text = response.text.strip()
-  match = re.search(r"```json(.*?)```", response_text, re.DOTALL)
+  response_text = (response.choices[0].message.content or "").strip()
+  match = re.search(r"```json(.*?)```", response_text, re.DOTALL | re.IGNORECASE)
   json_str = match.group(1).strip() if match else response_text
 
   cleaned_str = (
