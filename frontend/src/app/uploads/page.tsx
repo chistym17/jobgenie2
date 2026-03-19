@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import Navbar from "../components/v2/Navbar";
 import ConfirmationModal from "../components/v2/ConfirmationModal";
 import { Upload, Clock, CheckCircle2, AlertTriangle, ArrowUpRight, Bell, Sparkles, X, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, Loader2 } from "lucide-react";
@@ -382,6 +382,43 @@ export default function ResumeUploadsDashboard() {
   const { deleteUpload, isDeleting } = useDeleteUpload();
   const [deleteConfirmUploadId, setDeleteConfirmUploadId] = useState<string | null>(null);
   const { notifications, toasts, removeToast } = useNotifications(focusedUploadId, focusedStatus, focusedErrorMessage);
+
+  const redirectInFlightRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!focusedUploadId) return;
+    if (redirectInFlightRef.current) return;
+    if (focusedStatus !== "completed" && focusedStatus !== "recommendations") return;
+
+    const redirectKey = `recommendations_preview_redirected_${focusedUploadId}`;
+    if (localStorage.getItem(redirectKey)) return;
+
+    redirectInFlightRef.current = true;
+    localStorage.setItem(redirectKey, "1");
+
+    const backendV2Base = (process.env.NEXT_PUBLIC_BACKEND_URL || "").replace("/api/v1", "/api/v2");
+    const storageKey = `recommendations_preview_jobs_${focusedUploadId}`;
+
+    const run = async () => {
+      try {
+        if (backendV2Base) {
+          const res = await fetch(`${backendV2Base}/recommendations/${focusedUploadId}`);
+          if (res.ok) {
+            const data = await res.json();
+            const jobs = Array.isArray(data?.recommendations) ? data.recommendations : [];
+            localStorage.setItem(storageKey, JSON.stringify(jobs));
+          }
+        }
+      } catch {
+      } finally {
+        router.push(`/recommendations/preview?upload_id=${encodeURIComponent(focusedUploadId)}`);
+      }
+    };
+
+    setTimeout(() => {
+      run();
+    }, 300);
+  }, [focusedUploadId, focusedStatus, router]);
   
   // Upload state
   const [file, setFile] = useState<File | null>(null);

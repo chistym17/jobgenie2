@@ -18,7 +18,7 @@ export default function ToastContainer({ toasts, onClose }: ToastContainerProps)
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-20 right-4 z-50 flex flex-col gap-2 max-w-sm">
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 items-end max-w-sm">
       {toasts.map((toast) => (
         <Toast
           key={toast.id}

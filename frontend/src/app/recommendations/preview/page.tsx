@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Briefcase, GraduationCap, Link2, MapPin, Sparkles, Star } from "lucide-react";
-import Navbar from "../../../components/v2/Navbar";
+import Navbar from "../../components/v2/Navbar";
 import { useSearchParams } from "next/navigation";
 
 type Recommendation = {
