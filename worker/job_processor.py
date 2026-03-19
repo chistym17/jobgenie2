@@ -1,12 +1,11 @@
-##to process,embed and save all data to qdrant
 import time
 import json
 from datetime import datetime
 from utils.crawler import JobCrawler
-from utils.job_data_cleaner import JobLLMProcessor
 from db import fetch_all_jobs
 from utils.local_embedder import get_embedding
 from utils.qdrant_service import init_collection, insert_document
+from utils.manual_job_parser import manual_parse_job
 import asyncio
 from typing import Dict, List
 import os
@@ -20,22 +19,28 @@ RATE_LIMIT_DELAY = 30
 
 class JobProcessor:
     def __init__(self):
-        """Initialize the job processing pipeline"""
         self.crawler = JobCrawler()
-        self.llm_processor = JobLLMProcessor()
         self.processed_jobs = []
         self.failed_jobs = []
         self.start_time = None
         self.end_time = None
 
     def _log(self, message: str):
-        """Helper method to log with timestamp"""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"[{timestamp}] {message}")
 
     def _create_embedding(self, job_data: Dict) -> List[float]:
-        """Create embedding from job data"""
-        text_to_embed = f"{job_data.get('title', '')} {job_data.get('description', '')}"
+        title = str(job_data.get("title", "") or "")
+        desc = str(job_data.get("description", "") or "")
+        text_to_embed = f"{title}\n{desc}".strip()
+
+        try:
+            max_chars = int(os.getenv("JOB_EMBED_MAX_CHARS", "6000"))
+        except Exception:
+            max_chars = 6000
+        max_chars = max(500, min(50000, max_chars))
+        if len(text_to_embed) > max_chars:
+            text_to_embed = text_to_embed[: max_chars - 1] + "…"
         
         embedding = get_embedding(text_to_embed)
         if not embedding:
@@ -45,7 +50,6 @@ class JobProcessor:
         return embedding
 
     async def process_job(self, job: Dict) -> None:
-        """Process a single job with rate limiting"""
         job_id = job.get('_id')
         job_title = job.get('title', 'Unknown')
         
@@ -63,8 +67,19 @@ class JobProcessor:
                 })
                 return
 
-            self._log(f"Processing with LLM: {job_title}")
-            processed_data = self.llm_processor.process_job_posting(scrape_result)
+            processed_data = manual_parse_job(
+                scrape_result,
+                fallback_title=str(job.get("title", "") or ""),
+                fallback_company=str(job.get("company", "") or ""),
+                fallback_url=str(job.get("url", "") or ""),
+            )
+            if not processed_data:
+                self._log(f"Skipping job (feed/gated/too-short): {job_title}")
+                self.failed_jobs.append({
+                    'title': job_title,
+                    'error': 'Skipped (feed/gated/too-short scrape)'
+                })
+                return
             
             self._log(f"Creating embedding for: {job_title}")
             embedding = self._create_embedding(processed_data)
@@ -82,7 +97,7 @@ class JobProcessor:
             try:
                 job_id = job.get('id') or str(job.get('_id', ''))
                 payload = {
-                    'title': job_title,
+                    'title': processed_data.get("title") or job_title,
                     'content': processed_data,
                     'job_id': job_id,
                     'url': job.get('url', ''),
@@ -90,7 +105,7 @@ class JobProcessor:
                     'date': job.get('date', '')
                 }
                 
-                qdrant_id = hash(job_title) % 1000000  
+                qdrant_id = hash(str(job.get('id') or job.get('url') or job_title)) % 1000000
                 
                 insert_document(
                     id=qdrant_id,
@@ -119,7 +134,6 @@ class JobProcessor:
         time.sleep(RATE_LIMIT_DELAY)
 
     async def process_and_upload_jobs(self) -> None:
-        """Run the entire job processing pipeline"""
         self.start_time = datetime.now()
         self._log("Starting job processing pipeline...")
 
