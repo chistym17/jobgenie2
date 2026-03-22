@@ -1,20 +1,20 @@
 'use client';
 
 import React, { useMemo, useState, useEffect, useRef } from "react";
-import Navbar from "../components/v2/Navbar";
-import ConfirmationModal from "../components/v2/ConfirmationModal";
+import Navbar from "../../components/v2/Navbar";
+import ConfirmationModal from "../../components/v2/ConfirmationModal";
 import { Upload, Clock, CheckCircle2, AlertTriangle, ArrowUpRight, Bell, Sparkles, X, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, Loader2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useCurrentUser } from "../hooks/useCurrentUser";
-import { useUploadHistory } from "../hooks/useUploadHistory";
-import { useUploadStatus } from "../hooks/useUploadStatus";
-import { useResumeDetail } from "../hooks/useResumeDetail";
-import { useDeleteUpload } from "../hooks/useDeleteUpload";
-import { useNotifications } from "../hooks/useNotifications";
-import { useResumeUploadV2 } from "../hooks/useResumeUploadV2";
-import ToastContainer from "../components/v2/ToastContainer";
-import NotificationItem from "../components/v2/NotificationItem";
-import { useActivityTimeline } from "../hooks/useActivityTimeline";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
+import { useUploadHistory } from "../../hooks/useUploadHistory";
+import { useUploadStatus } from "../../hooks/useUploadStatus";
+import { useResumeDetail } from "../../hooks/useResumeDetail";
+import { useDeleteUpload } from "../../hooks/useDeleteUpload";
+import { useNotifications } from "../../hooks/useNotifications";
+import { useResumeUploadV2 } from "../../hooks/useResumeUploadV2";
+import ToastContainer from "../../components/v2/ToastContainer";
+import NotificationItem from "../../components/v2/NotificationItem";
+import { useActivityTimeline } from "../../hooks/useActivityTimeline";
 import { useRouter } from "next/navigation";
 
 const statusConfig: Record<

@@ -1,25 +1,20 @@
 "use client";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { Upload, FileText, X, Loader2, Sparkles, Target, Zap } from "lucide-react";
 import { Toaster, toast } from "sonner";
-import Navbar from "../components/v2/Navbar";
-import { useCurrentUser } from "../hooks/useCurrentUser";
+import Navbar from "../../components/v2/Navbar";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
 import { useRouter } from "next/navigation";
-import { useResumeUploadV2 } from "../hooks/useResumeUploadV2";
+import { useResumeUploadV2 } from "../../hooks/useResumeUploadV2";
 
 export default function ResumeUploadSection() {
     const router = useRouter();
     const [file, setFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const { user, loading } = useCurrentUser();
+    const { user } = useCurrentUser();
     const userEmail = user?.email || "";
     const { isUploading, uploadResume } = useResumeUploadV2();
-
-    useEffect(() => {
-        if (loading) return;
-        if (!user) router.push('/login');
-    }, [user, router, loading]);
 
     const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();

@@ -36,3 +36,14 @@ export async function apiFetch(
   }
   return fetch(url, { ...options, headers });
 }
+
+export function safeRedirectPath(next: string | null): string {
+  if (!next || typeof next !== "string") return "/upload";
+  try {
+    const decoded = decodeURIComponent(next);
+    if (decoded.startsWith("/") && !decoded.startsWith("//")) return decoded;
+  } catch {
+    return "/upload";
+  }
+  return "/upload";
+}

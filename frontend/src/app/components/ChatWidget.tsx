@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { WSJob } from '../recommendations/page';
+import type { WSJob } from '../(protected)/recommendations/page';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 
 export interface Message {

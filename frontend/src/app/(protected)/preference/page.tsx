@@ -1,8 +1,8 @@
 "use client";
 import { NextPage } from 'next';
 import Head from 'next/head';
-import Navbar from '../components/Navbar';
-import SelectPreferences from '../components/SelectPreferences';
+import Navbar from '../../components/Navbar';
+import SelectPreferences from '../../components/SelectPreferences';
 
 interface UserPreferencesData {
     jobTitle: string[];

@@ -24,29 +24,27 @@ function parseJwt(token: string): any {
   }
 }
 
+function getInitialAuthState(): { user: User | null; loading: boolean } {
+  if (typeof window === "undefined") {
+    return { user: null, loading: true };
+  }
+  const token = localStorage.getItem("token");
+  if (!token) {
+    return { user: null, loading: false };
+  }
+  const payload = parseJwt(token);
+  if (payload && payload.sub) {
+    return { user: { email: payload.sub, name: payload.name }, loading: false };
+  }
+  return { user: null, loading: false };
+}
+
 export function useCurrentUser(): { user: User | null; loading: boolean } {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [state, setState] = useState(getInitialAuthState);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      setLoading(false);
-      return;
-    }
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
-    const payload = parseJwt(token);
-    if (payload && payload.sub) {
-      setUser({ email: payload.sub, name: payload.name });
-    } else {
-      setUser(null);
-    }
-    setLoading(false);
+    setState(getInitialAuthState());
   }, []);
 
-  return { user, loading };
+  return { user: state.user, loading: state.loading };
 }

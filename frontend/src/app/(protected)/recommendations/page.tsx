@@ -1,14 +1,13 @@
 "use client";
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
-import JobDetailsModal from '../components/JobDetailsModal';
-import ChatWidget from '../components/ChatWidget';
-import Navbar from '../components/Navbar';
-import { useCurrentUser } from '../hooks/useCurrentUser';
+import JobDetailsModal from '../../components/JobDetailsModal';
+import ChatWidget from '../../components/ChatWidget';
+import Navbar from '../../components/Navbar';
+import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { motion } from 'framer-motion';
-import RecommendationLoader from '../components/RecommendationLoader';
-import { useRouter } from 'next/navigation';
-import RecommendationProgress from '../components/RecommendationProgress';
+import RecommendationLoader from '../../components/RecommendationLoader';
+import RecommendationProgress from '../../components/RecommendationProgress';
 
 export interface WSJob {
     "Job Title": string;
@@ -30,26 +29,20 @@ export interface WSJob {
 let cachedRecommendations: WSJob[] | null = null;
 
 export default function Home() {
-    const router = useRouter();
     const [jobs, setJobs] = useState<WSJob[]>([]);
     const [selectedJob, setSelectedJob] = useState<WSJob | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
-    const { user, loading: userLoading } = useCurrentUser();
+    const { user } = useCurrentUser();
     const email = user?.email;
 
     useEffect(() => {
-        if (userLoading) {
+        if (!email) {
             return;
         }
         setLoading(true);
-
-        if (!user) {
-            router.push('/login');
-            return;
-        }
 
         if (cachedRecommendations !== null) {
             setJobs(cachedRecommendations);
@@ -117,7 +110,7 @@ export default function Home() {
                     setLoading(false);
                 });
         }
-    }, [user, userLoading]);
+    }, [email]);
 
     return (
         <div className="min-h-screen bg-gray-50">
