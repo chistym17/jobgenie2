@@ -14,6 +14,12 @@ import { useNotifications } from "../../hooks/useNotifications";
 import { useResumeUploadV2 } from "../../hooks/useResumeUploadV2";
 import ToastContainer from "../../components/v2/ToastContainer";
 import NotificationItem from "../../components/v2/NotificationItem";
+import {
+  UploadHistorySkeleton,
+  ActivityTimelineSkeleton,
+  RecommendationsTabSkeleton,
+  ResumeDetailModalSkeleton,
+} from "../../components/v2/DashboardSkeletons";
 import { useActivityTimeline } from "../../hooks/useActivityTimeline";
 import { useRouter } from "next/navigation";
 
@@ -285,8 +291,8 @@ function ActivityTimelineTab({ focusedUploadId }: { focusedUploadId: string | nu
           No active upload selected. Upload a resume to see progress here.
         </div>
       ) : isLoading ? (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-base text-brand-muted min-h-[300px] flex items-center justify-center">
-          Loading activity timeline...
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 sm:p-10 min-h-[300px]">
+          <ActivityTimelineSkeleton />
         </div>
       ) : activities.length === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-12 text-center text-base text-brand-muted min-h-[300px] flex items-center justify-center">
@@ -376,9 +382,17 @@ export default function ResumeUploadsDashboard() {
   const { user } = useCurrentUser();
   const userEmail = user?.email || null;
   const { items: historyItems, isLoading: isHistoryLoading, refetch: refetchHistory } = useUploadHistory(userEmail);
-  const { status: focusedStatus, errorMessage: focusedErrorMessage } = useUploadStatus(focusedUploadId, !!focusedUploadId);
+  const {
+    status: focusedStatus,
+    errorMessage: focusedErrorMessage,
+    isLoading: isFocusedStatusLoading,
+  } = useUploadStatus(focusedUploadId, !!focusedUploadId);
   const [detailUploadId, setDetailUploadId] = useState<string | null>(null);
-  const { data: detail, isLoading: isDetailLoading } = useResumeDetail(detailUploadId);
+  const {
+    data: detail,
+    isLoading: isDetailLoading,
+    error: detailError,
+  } = useResumeDetail(detailUploadId);
   const { deleteUpload, isDeleting } = useDeleteUpload();
   const [deleteConfirmUploadId, setDeleteConfirmUploadId] = useState<string | null>(null);
   const { notifications, toasts, removeToast } = useNotifications(focusedUploadId, focusedStatus, focusedErrorMessage);
@@ -579,11 +593,7 @@ export default function ResumeUploadsDashboard() {
                   </div>
 
                   <div className="border-t border-white/10 mt-6 pt-6 space-y-3">
-                    {isHistoryLoading && (
-                      <div className="py-10 text-center text-sm text-brand-muted">
-                        Loading your uploads...
-                      </div>
-                    )}
+                    {isHistoryLoading && <UploadHistorySkeleton rows={5} />}
 
                     {!isHistoryLoading && paginatedUploads.map((upload) => {
                       const isFocused = focusedUploadId === upload.upload_id;
@@ -741,7 +751,15 @@ export default function ResumeUploadsDashboard() {
                   <h2 className="text-xl sm:text-2xl font-semibold text-white mb-3">
                     Your recommendations
                   </h2>
-                  {focusedStatus === "completed" || focusedStatus === "recommendations" ? (
+                  {focusedUploadId && isFocusedStatusLoading ? (
+                    <>
+                      <div className="text-sm sm:text-base text-brand-muted mb-8 space-y-2">
+                        <div className="h-4 w-full max-w-lg rounded-md bg-white/10 animate-pulse" />
+                        <div className="h-4 w-2/3 max-w-md rounded-md bg-white/[0.06] animate-pulse" />
+                      </div>
+                      <RecommendationsTabSkeleton />
+                    </>
+                  ) : focusedStatus === "completed" || focusedStatus === "recommendations" ? (
                     <>
                       <p className="text-sm sm:text-base text-brand-muted mb-8">
                         Your latest resume has been processed and recommendations are ready. View them to see where you are the best fit.
@@ -820,7 +838,7 @@ export default function ResumeUploadsDashboard() {
         variant="danger"
       />
 
-      {detailUploadId && detail && (
+      {detailUploadId && (
         <div className="fixed inset-0 z-40 flex items-center justify-center px-4 sm:px-6" onClick={() => setDetailUploadId(null)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
           <div
@@ -832,24 +850,43 @@ export default function ResumeUploadsDashboard() {
                 <p className="text-xs uppercase tracking-wide text-brand-muted mb-1">
                   Parsed resume
                 </p>
-                <h3 className="text-xl sm:text-2xl font-semibold text-white">
-                  {detail.name || "Unnamed candidate"}
-                </h3>
-                {detail.contact?.email && (
-                  <p className="text-xs sm:text-sm text-brand-muted mt-1">
-                    {detail.contact.email}
-                  </p>
+                {!isDetailLoading && detail && (
+                  <>
+                    <h3 className="text-xl sm:text-2xl font-semibold text-white">
+                      {detail.name || "Unnamed candidate"}
+                    </h3>
+                    {detail.contact?.email && (
+                      <p className="text-xs sm:text-sm text-brand-muted mt-1">
+                        {detail.contact.email}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
               <button
                 onClick={() => setDetailUploadId(null)}
-                className="text-brand-muted hover:text-white rounded-full p-1"
+                className="text-brand-muted hover:text-white rounded-full p-1 shrink-0"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {detail.skills && detail.skills.length > 0 && (
+            {isDetailLoading && <ResumeDetailModalSkeleton />}
+
+            {!isDetailLoading && detailError && (
+              <div className="py-10 text-center">
+                <p className="text-sm text-red-300">{detailError}</p>
+                <button
+                  type="button"
+                  onClick={() => setDetailUploadId(null)}
+                  className="mt-6 inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-medium border border-white/20 text-white hover:bg-white/10"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+
+            {!isDetailLoading && !detailError && detail && detail.skills && detail.skills.length > 0 && (
               <div className="mb-5">
                 <p className="text-xs uppercase tracking-wide text-brand-muted mb-2">
                   Key skills
@@ -867,7 +904,7 @@ export default function ResumeUploadsDashboard() {
               </div>
             )}
 
-            {detail.experience && detail.experience.length > 0 && (
+            {!isDetailLoading && !detailError && detail && detail.experience && detail.experience.length > 0 && (
               <div className="space-y-3 mt-2 overflow-y-auto pr-1 thin-scroll">
                 <p className="text-xs uppercase tracking-wide text-brand-muted">
                   Experience
@@ -898,7 +935,10 @@ export default function ResumeUploadsDashboard() {
               </div>
             )}
 
-            {(!detail.skills || detail.skills.length === 0) &&
+            {!isDetailLoading &&
+              !detailError &&
+              detail &&
+              (!detail.skills || detail.skills.length === 0) &&
               (!detail.experience || detail.experience.length === 0) && (
                 <p className="text-sm text-brand-muted mt-4">
                   Parsed data is not available yet for this resume.
