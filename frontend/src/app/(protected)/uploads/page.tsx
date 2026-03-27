@@ -12,6 +12,7 @@ import { useResumeDetail } from "../../hooks/useResumeDetail";
 import { useDeleteUpload } from "../../hooks/useDeleteUpload";
 import { useNotifications } from "../../hooks/useNotifications";
 import { useResumeUploadV2 } from "../../hooks/useResumeUploadV2";
+import { useRecommendationHistory } from "../../hooks/useRecommendationHistory";
 import ToastContainer from "../../components/v2/ToastContainer";
 import NotificationItem from "../../components/v2/NotificationItem";
 import {
@@ -383,6 +384,12 @@ export default function ResumeUploadsDashboard() {
   const userEmail = user?.email || null;
   const { items: historyItems, isLoading: isHistoryLoading, refetch: refetchHistory } = useUploadHistory(userEmail);
   const {
+    items: recommendationHistoryItems,
+    isLoading: isRecommendationHistoryLoading,
+    error: recommendationHistoryError,
+    refetch: refetchRecommendationHistory,
+  } = useRecommendationHistory(userEmail);
+  const {
     status: focusedStatus,
     errorMessage: focusedErrorMessage,
     isLoading: isFocusedStatusLoading,
@@ -433,6 +440,12 @@ export default function ResumeUploadsDashboard() {
       run();
     }, 300);
   }, [focusedUploadId, focusedStatus, router]);
+
+  useEffect(() => {
+    if (focusedStatus === "completed" || focusedStatus === "recommendations") {
+      refetchRecommendationHistory();
+    }
+  }, [focusedStatus, refetchRecommendationHistory]);
   
   // Upload state
   const [file, setFile] = useState<File | null>(null);
@@ -751,7 +764,20 @@ export default function ResumeUploadsDashboard() {
                   <h2 className="text-xl sm:text-2xl font-semibold text-white mb-3">
                     Your recommendations
                   </h2>
-                  {focusedUploadId && isFocusedStatusLoading ? (
+
+                  {(focusedStatus === "embedding" || focusedStatus === "embedding_completed") && (
+                    <div className="rounded-2xl border border-brand-secondary/40 bg-brand-secondary-soft px-5 py-4 mb-6 flex items-start gap-3">
+                      <Sparkles className="h-5 w-5 text-brand-secondary mt-0.5" />
+                      <div>
+                        <p className="text-sm text-white font-medium">Preparing new recommendations...</p>
+                        <p className="text-xs text-brand-muted mt-1">
+                          Your previous recommendation sets are still available below.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {isRecommendationHistoryLoading ? (
                     <>
                       <div className="text-sm sm:text-base text-brand-muted mb-8 space-y-2">
                         <div className="h-4 w-full max-w-lg rounded-md bg-white/10 animate-pulse" />
@@ -759,55 +785,72 @@ export default function ResumeUploadsDashboard() {
                       </div>
                       <RecommendationsTabSkeleton />
                     </>
-                  ) : focusedStatus === "completed" || focusedStatus === "recommendations" ? (
-                    <>
-                      <p className="text-sm sm:text-base text-brand-muted mb-8">
-                        Your latest resume has been processed and recommendations are ready. View them to see where you are the best fit.
+                  ) : recommendationHistoryError ? (
+                    <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-8 min-h-[220px] flex flex-col items-center justify-center gap-3">
+                      <p className="text-sm text-red-200">Failed to load recommendation history.</p>
+                      <button
+                        type="button"
+                        onClick={refetchRecommendationHistory}
+                        className="inline-flex items-center justify-center rounded-full px-5 py-2 text-xs sm:text-sm font-medium border border-red-400/60 text-red-100 hover:bg-red-500/20 transition-colors"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : recommendationHistoryItems.length === 0 ? (
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-10 flex flex-col items-center justify-center gap-4 min-h-[300px]">
+                      <Sparkles className="h-6 w-6 text-brand-secondary" />
+                      <p className="text-sm text-white">No saved recommendations yet.</p>
+                      <p className="text-xs text-brand-muted text-center max-w-md">
+                        Upload and process a resume to generate your first personalized recommendation set.
                       </p>
-                      <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-10 flex flex-col items-center justify-center gap-4 min-h-[300px]">
-                        <Sparkles className="h-6 w-6 text-emerald-300" />
-                        <p className="text-sm text-white">
-                          Recommendations are ready based on your latest profile.
-                        </p>
-                        <a
-                          href="/recommendations"
-                          className="inline-flex items-center justify-center gap-2 rounded-full px-5 py-2 text-xs sm:text-sm font-medium bg-white text-brand-ink"
-                        >
-                          Go to recommendations
-                          <ArrowUpRight className="h-4 w-4" />
-                        </a>
-                      </div>
-                    </>
-                  ) : focusedStatus === "embedding" || focusedStatus === "embedding_completed" ? (
-                    <>
-                      <p className="text-sm sm:text-base text-brand-muted mb-8">
-                        We are preparing embeddings and recommendations for your latest resume. This will only take a moment.
-                      </p>
-                      <div className="rounded-2xl border border-brand-secondary/40 bg-brand-secondary-soft p-10 flex flex-col items-center justify-center gap-4 min-h-[300px]">
-                        <Sparkles className="h-6 w-6 text-brand-secondary" />
-                        <p className="text-sm text-white">
-                          Preparing your recommendations...
-                        </p>
-                        <p className="text-xs text-brand-muted">
-                          You can stay on this page while we finish the computation.
-                        </p>
-                      </div>
-                    </>
+                    </div>
                   ) : (
-                    <>
-                      <p className="text-sm sm:text-base text-brand-muted mb-8">
-                        Once your latest resume is processed, this space will highlight recommended roles and explain why they fit.
-                      </p>
-                      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-10 flex flex-col items-center justify-center gap-4 min-h-[300px]">
-                        <Sparkles className="h-6 w-6 text-brand-secondary" />
-                        <p className="text-sm text-white">
-                          Recommendations will appear here after processing.
-                        </p>
-                        <p className="text-xs text-brand-muted">
-                          Upload a resume or re-run matching from the recommendations page.
-                        </p>
-                      </div>
-                    </>
+                    <div className="space-y-3">
+                      {recommendationHistoryItems.map((item) => {
+                        const linkedUpload = historyItems.find((x) => x.upload_id === item.upload_id);
+                        const created = item.created_at
+                          ? new Date(item.created_at).toLocaleString()
+                          : "Unknown date";
+                        const avg = typeof item.avg_match_score === "number"
+                          ? `${Math.round(item.avg_match_score)}% avg match`
+                          : "Avg match N/A";
+
+                        return (
+                          <button
+                            key={item._id}
+                            type="button"
+                            onClick={() =>
+                              router.push(
+                                `/recommendations/preview?upload_id=${encodeURIComponent(item.upload_id)}`
+                              )
+                            }
+                            className="w-full text-left rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-colors p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-base font-medium text-white truncate">
+                                {linkedUpload?.file_name || `Upload ${item.upload_id.slice(0, 8)}`}
+                              </p>
+                              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                                <span className="inline-flex items-center rounded-full px-2.5 py-1 border border-white/10 text-brand-muted">
+                                  {item.total_recommendations} matches
+                                </span>
+                                <span className="inline-flex items-center rounded-full px-2.5 py-1 border border-white/10 text-brand-muted">
+                                  {avg}
+                                </span>
+                                <span className="inline-flex items-center rounded-full px-2.5 py-1 border border-white/10 text-brand-muted">
+                                  {created}
+                                </span>
+                              </div>
+                            </div>
+
+                            <span className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full border border-white/10 text-brand-muted hover:text-brand-ink hover:bg-brand-primary transition-colors">
+                              Open
+                              <ArrowUpRight className="h-4 w-4" />
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               )}

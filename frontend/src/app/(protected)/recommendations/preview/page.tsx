@@ -118,6 +118,7 @@ function Pill(props: { children: ReactNode; className?: string }) {
 export default function RecommendationsPreviewPage() {
   const searchParams = useSearchParams();
   const uploadId = searchParams.get("upload_id");
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(!!uploadId);
 
   const [recommendations, setRecommendations] = useState<Recommendation[]>(
     uploadId ? [] : fallbackRecommendations
@@ -231,6 +232,7 @@ export default function RecommendationsPreviewPage() {
     const run = async () => {
       if (typeof window === "undefined") return;
       if (!uploadId) return;
+      if (!cancelled) setIsLoadingRecommendations(true);
 
       const storageKey = `recommendations_preview_jobs_${uploadId}`;
       const redirected = localStorage.getItem(storageKey);
@@ -243,6 +245,7 @@ export default function RecommendationsPreviewPage() {
               setRecommendations(normalized);
               setSelectedId(normalized[0]?.id || "");
               setModalOpen(false);
+              setIsLoadingRecommendations(false);
             }
             return;
           }
@@ -264,8 +267,12 @@ export default function RecommendationsPreviewPage() {
           setRecommendations(normalized);
           setSelectedId(normalized[0]?.id || "");
           setModalOpen(false);
+          setIsLoadingRecommendations(false);
         }
       } catch {
+        if (!cancelled) {
+          setIsLoadingRecommendations(false);
+        }
       }
     };
 
@@ -293,18 +300,15 @@ export default function RecommendationsPreviewPage() {
                     Your Recommendations
                   </h1>
                 </div>
-                <p className="text-brand-muted mt-3 max-w-2xl">
-                  pick a role to see a tailored fit summary and next steps.
-                </p>
               </div>
 
               <div className="flex gap-2">
                 <Pill>
-                  {uploadId ? (recommendations.length ? `${recommendations.length} matches` : "Loading") : `${recommendations.length} matches`}
+                  {isLoadingRecommendations ? "..." : `${recommendations.length} matches`}
                 </Pill>
                 <Pill>
                   <Briefcase size={14} />
-                  Updated just now
+                  Recommendations
                 </Pill>
               </div>
             </div>
@@ -318,16 +322,29 @@ export default function RecommendationsPreviewPage() {
                     <h2 className="text-lg sm:text-xl font-semibold text-white">
                       Recommended roles
                     </h2>
-                    <p className="text-brand-muted text-sm mt-1">
-                      Use "See details" to view the full description and guidance.
-                    </p>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  {!recommendations.length ? (
+                  {isLoadingRecommendations ? (
+                    Array.from({ length: 4 }).map((_, idx) => (
+                      <div
+                        key={`skeleton-${idx}`}
+                        className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div className="min-w-0 flex-1 space-y-2.5">
+                            <div className="h-5 w-[70%] rounded-md bg-white/10 animate-pulse" />
+                            <div className="h-4 w-[45%] rounded-md bg-white/[0.08] animate-pulse" />
+                            <div className="h-4 w-[35%] rounded-md bg-white/[0.06] animate-pulse" />
+                          </div>
+                          <div className="h-10 w-28 rounded-xl bg-white/10 animate-pulse" />
+                        </div>
+                      </div>
+                    ))
+                  ) : !recommendations.length ? (
                     <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 text-brand-muted text-sm">
-                      Loading recommendations...
+                      No recommendations found.
                     </div>
                   ) : (
                     paginated.map((rec) => {
