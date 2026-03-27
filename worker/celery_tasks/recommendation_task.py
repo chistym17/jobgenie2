@@ -32,7 +32,14 @@ def generate_recommendations_task(user_email: str, upload_id: str | None = None,
         
         service = RecommenderService()
         recommendations = service.generate_recommendations(user_email)
-        
+
+        if upload_id and not recommendations:
+            sanitized = sanitize_error_message("No recommendations generated")
+            update_upload_status(upload_id, "failed", error_message=sanitized)
+            add_activity_event(upload_id, "Processing Failed", "No job recommendations could be generated", "failed", sanitized)
+            logger.error("No recommendations returned for upload_id=%s user_email=%s", upload_id, user_email)
+            return []
+
         if upload_id and recommendations:
             client = get_mongodb_client()
             try:

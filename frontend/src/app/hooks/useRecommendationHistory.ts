@@ -17,6 +17,7 @@ export interface RecommendationHistoryItem {
 export function useRecommendationHistory(userEmail: string | null) {
   const [items, setItems] = useState<RecommendationHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const backendV2Base =
@@ -55,10 +56,41 @@ export function useRecommendationHistory(userEmail: string | null) {
     fetchHistory();
   }, [fetchHistory]);
 
+  const deleteRecommendation = useCallback(
+    async (recommendationId: string): Promise<boolean> => {
+      setIsDeleting(true);
+      try {
+        const res = await fetch(
+          `${backendV2Base}/recommendations/item/${encodeURIComponent(
+            recommendationId
+          )}`,
+          { method: "DELETE" }
+        );
+        if (!res.ok) {
+          const errData = await res
+            .json()
+            .catch(() => ({ detail: "Failed to delete recommendation" }));
+          throw new Error(errData.detail || "Failed to delete recommendation");
+        }
+        setItems((prev) => prev.filter((x) => x._id !== recommendationId));
+        setError(null);
+        return true;
+      } catch (err: any) {
+        setError(err.message || "Failed to delete recommendation");
+        return false;
+      } finally {
+        setIsDeleting(false);
+      }
+    },
+    [backendV2Base]
+  );
+
   return {
     items,
     isLoading,
+    isDeleting,
     error,
     refetch: fetchHistory,
+    deleteRecommendation,
   };
 }

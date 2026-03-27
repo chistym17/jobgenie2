@@ -255,24 +255,38 @@ export default function RecommendationsPreviewPage() {
       }
 
       const backendV2Base = (process.env.NEXT_PUBLIC_BACKEND_URL || "").replace("/api/v1", "/api/v2");
-      if (!backendV2Base) return;
+      if (!backendV2Base) {
+        if (!cancelled) setIsLoadingRecommendations(false);
+        return;
+      }
+
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
       try {
-        const res = await fetch(`${backendV2Base}/recommendations/${uploadId}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        const jobs = Array.isArray(data?.recommendations) ? data.recommendations : [];
-        const normalized = normalizeRecommendations(jobs);
-        if (!cancelled) {
-          setRecommendations(normalized);
-          setSelectedId(normalized[0]?.id || "");
-          setModalOpen(false);
-          setIsLoadingRecommendations(false);
+        for (let attempt = 0; attempt < 15; attempt++) {
+          if (cancelled) return;
+          const res = await fetch(`${backendV2Base}/recommendations/${uploadId}`);
+          if (res.ok) {
+            const data = await res.json();
+            const jobs = Array.isArray(data?.recommendations) ? data.recommendations : [];
+            const normalized = normalizeRecommendations(jobs);
+            if (!cancelled) {
+              setRecommendations(normalized);
+              setSelectedId(normalized[0]?.id || "");
+              setModalOpen(false);
+              setIsLoadingRecommendations(false);
+            }
+            return;
+          }
+          if (res.status !== 404) {
+            break;
+          }
+          await sleep(600 + attempt * 150);
         }
       } catch {
-        if (!cancelled) {
-          setIsLoadingRecommendations(false);
-        }
+      }
+      if (!cancelled) {
+        setIsLoadingRecommendations(false);
       }
     };
 

@@ -157,5 +157,16 @@ async def check_existing_recommendations(upload_id: str) -> Optional[Dict[str, A
     return await get_recommendations_by_upload(upload_id)
 
 
+async def delete_recommendation_by_id(recommendation_id: str) -> bool:
+    client = _get_mongo_client()
+    try:
+        db = client["jobs_db"]
+        collection = db[RECOMMENDATIONS_COLLECTION]
+        result = await collection.delete_one({"_id": ObjectId(recommendation_id)})
+        return result.deleted_count > 0
+    finally:
+        client.close()
+
+
 
 

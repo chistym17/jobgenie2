@@ -386,8 +386,10 @@ export default function ResumeUploadsDashboard() {
   const {
     items: recommendationHistoryItems,
     isLoading: isRecommendationHistoryLoading,
+    isDeleting: isRecommendationDeleting,
     error: recommendationHistoryError,
     refetch: refetchRecommendationHistory,
+    deleteRecommendation,
   } = useRecommendationHistory(userEmail);
   const {
     status: focusedStatus,
@@ -402,6 +404,7 @@ export default function ResumeUploadsDashboard() {
   } = useResumeDetail(detailUploadId);
   const { deleteUpload, isDeleting } = useDeleteUpload();
   const [deleteConfirmUploadId, setDeleteConfirmUploadId] = useState<string | null>(null);
+  const [deleteConfirmRecommendationId, setDeleteConfirmRecommendationId] = useState<string | null>(null);
   const { notifications, toasts, removeToast } = useNotifications(focusedUploadId, focusedStatus, focusedErrorMessage);
 
   const redirectInFlightRef = useRef(false);
@@ -409,7 +412,7 @@ export default function ResumeUploadsDashboard() {
     if (typeof window === "undefined") return;
     if (!focusedUploadId) return;
     if (redirectInFlightRef.current) return;
-    if (focusedStatus !== "completed" && focusedStatus !== "recommendations") return;
+    if (focusedStatus !== "completed") return;
 
     const redirectKey = `recommendations_preview_redirected_${focusedUploadId}`;
     if (localStorage.getItem(redirectKey)) return;
@@ -438,7 +441,7 @@ export default function ResumeUploadsDashboard() {
 
     setTimeout(() => {
       run();
-    }, 300);
+    }, 2200);
   }, [focusedUploadId, focusedStatus, router]);
 
   useEffect(() => {
@@ -816,14 +819,8 @@ export default function ResumeUploadsDashboard() {
                           : "Avg match N/A";
 
                         return (
-                          <button
+                          <div
                             key={item._id}
-                            type="button"
-                            onClick={() =>
-                              router.push(
-                                `/recommendations/preview?upload_id=${encodeURIComponent(item.upload_id)}`
-                              )
-                            }
                             className="w-full text-left rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-colors p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
                           >
                             <div className="min-w-0">
@@ -843,11 +840,30 @@ export default function ResumeUploadsDashboard() {
                               </div>
                             </div>
 
-                            <span className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full border border-white/10 text-brand-muted hover:text-brand-ink hover:bg-brand-primary transition-colors">
-                              Open
-                              <ArrowUpRight className="h-4 w-4" />
-                            </span>
-                          </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  router.push(
+                                    `/recommendations/preview?upload_id=${encodeURIComponent(item.upload_id)}`
+                                  )
+                                }
+                                className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full border border-white/10 text-brand-muted hover:text-brand-ink hover:bg-brand-primary transition-colors"
+                              >
+                                Open
+                                <ArrowUpRight className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeleteConfirmRecommendationId(item._id)}
+                                disabled={isRecommendationDeleting}
+                                className="inline-flex items-center justify-center p-2 rounded-full border border-red-500/40 text-red-300 hover:text-white hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Delete recommendation"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
                         );
                       })}
                     </div>
@@ -876,6 +892,20 @@ export default function ResumeUploadsDashboard() {
         }}
         title="Delete Resume Upload"
         message={`Are you sure you want to delete "${uploadsToShow.find(u => u.upload_id === deleteConfirmUploadId)?.file_name || 'this upload'}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={!!deleteConfirmRecommendationId}
+        onClose={() => setDeleteConfirmRecommendationId(null)}
+        onConfirm={async () => {
+          if (!deleteConfirmRecommendationId) return;
+          await deleteRecommendation(deleteConfirmRecommendationId);
+        }}
+        title="Delete Recommendation Set"
+        message="Are you sure you want to delete this recommendation set? This action cannot be undone."
         confirmText="Delete"
         cancelText="Cancel"
         variant="danger"

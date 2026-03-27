@@ -20,6 +20,13 @@ interface UploadStatusResponse {
   error_message?: string | null;
 }
 
+const TERMINAL_UPLOAD_STATUSES = new Set([
+  "completed",
+  "failed",
+  "parsing_failed",
+  "embedding_failed",
+]);
+
 export function useUploadStatus(uploadId: string | null, enabled: boolean) {
   const [status, setStatus] = useState<UploadStatusValue | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -50,12 +57,7 @@ export function useUploadStatus(uploadId: string | null, enabled: boolean) {
         setStatus(data.status);
         setErrorMessage(data.error_message || null);
         setError(null);
-        if (
-          data.status === "parsed" ||
-          data.status === "completed" ||
-          data.status === "failed" ||
-          data.status === "parsing_failed"
-        ) {
+        if (TERMINAL_UPLOAD_STATUSES.has(String(data.status))) {
           return;
         }
         setTimeout(poll, 2000);
