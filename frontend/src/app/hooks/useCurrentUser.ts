@@ -25,8 +25,12 @@ function parseJwt(token: string): any {
 }
 
 function getInitialAuthState(): { user: User | null; loading: boolean } {
+  return { user: null, loading: true };
+}
+
+function resolveAuthState(): { user: User | null; loading: boolean } {
   if (typeof window === "undefined") {
-    return { user: null, loading: true };
+    return { user: null, loading: false };
   }
   const token = localStorage.getItem("token");
   if (!token) {
@@ -43,7 +47,7 @@ export function useCurrentUser(): { user: User | null; loading: boolean } {
   const [state, setState] = useState(getInitialAuthState);
 
   useEffect(() => {
-    setState(getInitialAuthState());
+    setState(resolveAuthState());
   }, []);
 
   return { user: state.user, loading: state.loading };
