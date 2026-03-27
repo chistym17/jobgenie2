@@ -4,7 +4,8 @@ import uvicorn
 import json
 from services.explainer_service import ExplainerService
 from services.resume_advisor_service import ResumeAdvisorService
-from db import fetch_resume_data
+from services.match_coach_service import MatchCoachService
+from db import fetch_resume_data, fetch_resume_data_by_upload_id
 import datetime
 from db import check_mongodb_connection
 from utils.qdrant_service import check_qdrant_connection
@@ -106,6 +107,35 @@ def get_task_result(task_id: str):
             "status": "error",
             "error": str(e)
         }
+
+
+@app.post("/match-coach")
+async def match_coach(request: Request):
+    try:
+        payload = await request.json()
+        upload_id = payload.get("upload_id")
+        job = payload.get("job")
+
+        if not upload_id:
+            raise HTTPException(status_code=400, detail="upload_id is required")
+        if not isinstance(job, dict) or not job:
+            raise HTTPException(status_code=400, detail="job payload is required")
+
+        user_resume = fetch_resume_data_by_upload_id(upload_id)
+        if not user_resume:
+            raise HTTPException(status_code=404, detail="Resume not found for upload")
+
+        service = MatchCoachService()
+        result = service.explain_and_improve(job, user_resume)
+        return {
+            "upload_id": upload_id,
+            "why_good_match": result["why_good_match"],
+            "improvements": result["improvements"],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.websocket("/ws/chat")

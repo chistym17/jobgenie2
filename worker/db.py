@@ -1,4 +1,5 @@
 from pymongo import MongoClient
+from bson import ObjectId
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -55,3 +56,30 @@ def fetch_resume_data(user_email: str) -> dict:
     client.close()
 
     return resume
+
+
+def fetch_resume_data_by_upload_id(upload_id: str) -> dict:
+    client = get_mongodb_client()
+    db = client["jobs_db"]
+    uploads = db["resume_uploads"]
+    resumes = db["resumes"]
+    try:
+        upload = uploads.find_one({"_id": ObjectId(upload_id)})
+        if not upload:
+            return {}
+
+        resume_id = upload.get("resume_id")
+        if resume_id:
+            resume = resumes.find_one({"_id": resume_id})
+            if resume:
+                return resume
+
+        user_email = upload.get("user_email")
+        if user_email:
+            resume = resumes.find_one({"user_email": user_email})
+            if resume:
+                return resume
+
+        return {}
+    finally:
+        client.close()

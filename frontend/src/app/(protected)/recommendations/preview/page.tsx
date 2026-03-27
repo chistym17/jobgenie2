@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Briefcase, Link2, Sparkles } from "lucide-react";
 import Navbar from "../../../components/v2/Navbar";
 import { useSearchParams } from "next/navigation";
@@ -19,6 +19,37 @@ type Recommendation = {
   keyRequirements: string;
   keyRequirementItems: string[];
 };
+
+type MatchCoachResult = {
+  why_good_match: string[];
+  improvements: string[];
+};
+
+function normalizeCoachBullets(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((x) => String(x).trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(/\n+/)
+      .map((line) => line.replace(/^[-•*\d.)]+\s*/, "").trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function CoachBulletList({ items }: { items: string[] }) {
+  if (!items.length) return null;
+  return (
+    <ul className="mt-2 list-disc space-y-2 pl-5 text-brand-muted text-sm marker:text-brand-secondary">
+      {items.map((line, i) => (
+        <li key={i} className="leading-relaxed pl-0.5">
+          {line}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 const fallbackRecommendations: Recommendation[] = [
   {
@@ -119,6 +150,7 @@ export default function RecommendationsPreviewPage() {
   const searchParams = useSearchParams();
   const uploadId = searchParams.get("upload_id");
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(!!uploadId);
+  const workerBase = (process.env.NEXT_PUBLIC_WORKER_URL || "").replace(/\/$/, "");
 
   const [recommendations, setRecommendations] = useState<Recommendation[]>(
     uploadId ? [] : fallbackRecommendations
@@ -134,6 +166,11 @@ export default function RecommendationsPreviewPage() {
   }, [recommendations, selectedId]);
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [coachPanelOpen, setCoachPanelOpen] = useState(false);
+  const [coachResult, setCoachResult] = useState<MatchCoachResult | null>(null);
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [coachError, setCoachError] = useState("");
+  const coachCacheRef = useRef<Record<string, MatchCoachResult>>({});
 
   useEffect(() => {
     if (!recommendations.length) return;
@@ -145,6 +182,23 @@ export default function RecommendationsPreviewPage() {
   useEffect(() => {
     setPage(1);
   }, [uploadId]);
+
+  useEffect(() => {
+    if (!selected) {
+      setCoachResult(null);
+      setCoachError("");
+      return;
+    }
+    const key = `${uploadId || "local"}:${selected.id}`;
+    const cached = coachCacheRef.current[key];
+    if (cached) {
+      setCoachResult(cached);
+      setCoachError("");
+      return;
+    }
+    setCoachResult(null);
+    setCoachError("");
+  }, [selected, uploadId]);
 
   const totalPages = Math.max(
     1,
@@ -296,13 +350,89 @@ export default function RecommendationsPreviewPage() {
     };
   }, [uploadId]);
 
+  const coachPanelVisible =
+    !!selected && !modalOpen && recommendations.length > 0 && coachPanelOpen;
+
+  const closeJobDetailsModal = () => {
+    setModalOpen(false);
+    setCoachPanelOpen(true);
+  };
+
+  const handleExplainAndImprove = async () => {
+    if (!selected || !uploadId) {
+      setCoachError("Select a saved recommendation to use the coach.");
+      return;
+    }
+    if (!workerBase) {
+      setCoachError("Match coach service is unavailable.");
+      return;
+    }
+
+    const key = `${uploadId}:${selected.id}`;
+    const cached = coachCacheRef.current[key];
+    if (cached) {
+      setCoachResult(cached);
+      setCoachError("");
+      return;
+    }
+
+    setCoachLoading(true);
+    setCoachError("");
+    try {
+      const res = await fetch(`${workerBase}/match-coach`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          upload_id: uploadId,
+          job: {
+            job_id: selected.id,
+            title: selected.jobTitle,
+            company: selected.companyName,
+            location: selected.location,
+            job_type: selected.jobType,
+            salary: selected.salary,
+            match_score: selected.matchScore,
+            key_requirements: selected.keyRequirementItems,
+            description: selected.description,
+          },
+        }),
+      });
+      if (!res.ok) {
+        const payload = await res
+          .json()
+          .catch(() => ({ detail: "Failed to load match coach response" }));
+        throw new Error(payload.detail || "Failed to load match coach response");
+      }
+      const data = await res.json();
+      const nextResult: MatchCoachResult = {
+        why_good_match: normalizeCoachBullets(data?.why_good_match),
+        improvements: normalizeCoachBullets(data?.improvements),
+      };
+      if (!nextResult.why_good_match.length || !nextResult.improvements.length) {
+        throw new Error("Invalid coach response");
+      }
+      coachCacheRef.current[key] = nextResult;
+      setCoachResult(nextResult);
+    } catch (err: any) {
+      setCoachError(err.message || "Failed to load match coach response");
+    } finally {
+      setCoachLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text relative overflow-hidden">
       <div className="noise-bg" aria-hidden="true" />
       <Navbar />
 
-      <main className="pt-24 pb-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
+      <main className="pt-24 pb-12 px-4 sm:px-6 lg:px-8 relative">
+        <div
+          className={`max-w-7xl mx-auto transition-[padding] duration-300 ease-out ${
+            coachPanelVisible
+              ? "lg:pr-[min(22rem,calc(100vw-2.5rem))] max-lg:pb-[min(32vh,14rem)]"
+              : ""
+          }`}
+        >
           <header className="mb-8">
             <div className="flex items-start justify-between gap-4 flex-col md:flex-row md:items-end">
               <div>
@@ -316,14 +446,26 @@ export default function RecommendationsPreviewPage() {
                 </div>
               </div>
 
-              <div className="flex gap-2">
-                <Pill>
-                  {isLoadingRecommendations ? "..." : `${recommendations.length} matches`}
-                </Pill>
-                <Pill>
-                  <Briefcase size={14} />
-                  Recommendations
-                </Pill>
+              <div className="flex flex-col items-end gap-2">
+                <div className="flex gap-2">
+                  <Pill>
+                    {isLoadingRecommendations ? "..." : `${recommendations.length} matches`}
+                  </Pill>
+                  <Pill>
+                    <Briefcase size={14} />
+                    Recommendations
+                  </Pill>
+                </div>
+                {!!selected && recommendations.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setCoachPanelOpen((open) => !open)}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium border border-white/10 bg-white/[0.02] text-brand-muted hover:text-brand-ink hover:bg-brand-primary-soft transition-colors"
+                  >
+                    <Sparkles size={14} className="text-brand-primary" />
+                    {coachPanelOpen ? "Hide match coach" : "Open match coach"}
+                  </button>
+                )}
               </div>
             </div>
           </header>
@@ -366,7 +508,16 @@ export default function RecommendationsPreviewPage() {
                       return (
                         <div
                           key={rec.id}
-                          className={`w-full text-left rounded-2xl border transition-all ${
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setSelectedId(rec.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setSelectedId(rec.id);
+                            }
+                          }}
+                          className={`w-full text-left rounded-2xl border transition-all cursor-pointer ${
                             isSelected
                               ? "border-brand-primary-soft bg-brand-primary-soft/10"
                               : "border-white/10 bg-white/[0.02] hover:bg-white/[0.04]"
@@ -396,7 +547,8 @@ export default function RecommendationsPreviewPage() {
                             <div className="flex items-center gap-2 justify-end">
                               <button
                                 type="button"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setSelectedId(rec.id);
                                   setModalOpen(true);
                                 }}
@@ -442,9 +594,7 @@ export default function RecommendationsPreviewPage() {
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                 <div
                   className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                  onClick={() => {
-                    setModalOpen(false);
-                  }}
+                  onClick={closeJobDetailsModal}
                 />
                 <div className="relative w-full max-w-3xl glass-panel rounded-3xl border border-white/10 overflow-hidden">
                   <div className="p-6 border-b border-white/10 flex items-start justify-between gap-3">
@@ -456,15 +606,15 @@ export default function RecommendationsPreviewPage() {
                         {selected.companyName}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setModalOpen(false);
-                      }}
-                      className="px-3 py-2 rounded-xl text-sm font-medium border border-white/10 bg-white/[0.03] text-brand-muted hover:bg-white/[0.06] transition-colors"
-                    >
-                      Close
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={closeJobDetailsModal}
+                        className="px-3 py-2 rounded-xl text-sm font-medium border border-white/10 bg-white/[0.03] text-brand-muted hover:bg-white/[0.06] transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
                   </div>
 
                   <div className="p-6 overflow-y-auto max-h-[80vh] space-y-5">
@@ -506,16 +656,16 @@ export default function RecommendationsPreviewPage() {
                           href={selected.directLink}
                           target="_blank"
                           rel="noreferrer"
-                          className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl text-base font-semibold bg-white text-black hover:bg-white/90 transition-colors mt-1"
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-white text-black hover:bg-white/90 transition-colors mt-1"
                         >
-                          <Link2 size={18} />
+                          <Link2 size={16} />
                           Apply
                         </a>
                       ) : (
                         <button
                           type="button"
                           disabled
-                          className="w-full px-6 py-4 rounded-2xl text-base font-semibold bg-white/10 text-brand-muted cursor-not-allowed mt-1"
+                          className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-sm font-semibold bg-white/10 text-brand-muted cursor-not-allowed mt-1"
                         >
                           Apply
                         </button>
@@ -527,6 +677,95 @@ export default function RecommendationsPreviewPage() {
             )}
           </div>
         </div>
+
+        {coachPanelVisible && selected && (
+          <aside className="fixed z-30 flex flex-col glass-panel shadow-2xl border-white/10 max-lg:inset-x-3 max-lg:bottom-3 max-lg:top-auto max-lg:max-h-[min(55vh,24rem)] max-lg:h-auto max-lg:border max-lg:rounded-3xl lg:right-6 lg:top-24 lg:h-[calc(100vh-8rem)] lg:w-full lg:max-w-sm lg:border lg:border-l lg:rounded-3xl">
+            <div className="p-4 border-b border-white/10 flex items-start gap-3 shrink-0">
+              <div className="h-9 w-9 rounded-2xl bg-brand-primary-soft border border-brand-primary-soft flex items-center justify-center">
+                <Sparkles className="text-brand-primary" size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="text-white font-semibold leading-tight">Match Coach</div>
+                    <div className="text-brand-muted text-xs mt-0.5">
+                      Feedback for the selected role and your resume
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCoachPanelOpen(false)}
+                    className="inline-flex items-center justify-center h-7 w-7 rounded-full border border-white/10 text-brand-muted hover:text-white hover:bg-white/10 transition-colors text-xs"
+                    aria-label="Collapse match coach"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                <div className="text-xs uppercase tracking-wide text-brand-muted mb-1">
+                  Selected role
+                </div>
+                <div className="text-sm font-semibold text-white truncate">
+                  {selected.jobTitle}
+                </div>
+                <div className="text-xs text-brand-muted truncate mt-0.5">
+                  {selected.companyName}
+                  {selected.location ? ` • ${selected.location}` : ""}
+                </div>
+              </div>
+              <p className="text-brand-muted text-sm leading-relaxed">
+                Use match coach to understand why this role fits your profile and what to change
+                in your resume or cover letter before you apply.
+              </p>
+              <button
+                type="button"
+                onClick={handleExplainAndImprove}
+                disabled={coachLoading}
+                className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold border border-white/10 bg-brand-primary-soft text-brand-primary hover:bg-brand-primary hover:text-brand-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {coachLoading ? "Analyzing..." : "Explain + Improve"}
+              </button>
+              {(coachLoading || coachError || coachResult) && (
+                <AgentPanel
+                  title="Insights"
+                  subtitle="For this role and your resume"
+                  icon={<Sparkles className="text-brand-primary" size={18} />}
+                >
+                  {coachLoading ? (
+                    <div className="space-y-3">
+                      <div className="h-4 w-5/6 rounded-md bg-white/10 animate-pulse" />
+                      <div className="h-4 w-full rounded-md bg-white/[0.08] animate-pulse" />
+                      <div className="h-4 w-4/5 rounded-md bg-white/[0.06] animate-pulse" />
+                      <div className="h-px w-full bg-white/10 my-2" />
+                      <div className="h-4 w-2/3 rounded-md bg-white/10 animate-pulse" />
+                      <div className="h-4 w-full rounded-md bg-white/[0.08] animate-pulse" />
+                    </div>
+                  ) : coachError ? (
+                    <div className="text-sm text-red-300">{coachError}</div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <div className="text-white/90 text-xs font-semibold tracking-wide uppercase">
+                          Why this is a good match
+                        </div>
+                        <CoachBulletList items={coachResult?.why_good_match || []} />
+                      </div>
+                      <div>
+                        <div className="text-white/90 text-xs font-semibold tracking-wide uppercase">
+                          Improve your application
+                        </div>
+                        <CoachBulletList items={coachResult?.improvements || []} />
+                      </div>
+                    </div>
+                  )}
+                </AgentPanel>
+              )}
+            </div>
+          </aside>
+        )}
       </main>
     </div>
   );
