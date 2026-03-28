@@ -168,5 +168,19 @@ async def delete_recommendation_by_id(recommendation_id: str) -> bool:
         client.close()
 
 
+async def delete_recommendations_for_upload(upload_id: str) -> int:
+    client = _get_mongo_client()
+    try:
+        db = client["jobs_db"]
+        collection = db[RECOMMENDATIONS_COLLECTION]
+        result = await collection.delete_many({"upload_id": ObjectId(upload_id)})
+        n = int(result.deleted_count)
+        if n:
+            logger.info("Deleted %s recommendation doc(s) for upload_id=%s", n, upload_id)
+        return n
+    finally:
+        client.close()
+
+
 
 

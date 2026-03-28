@@ -260,6 +260,15 @@ async def try_consume_coach_call(
     }
 
 
+async def release_upload_quota_slot(user_email: str, upload_id: str) -> None:
+    await ensure_quota_indexes()
+    coll = _get_collection()
+    await coll.update_many(
+        {"user_email": user_email},
+        {"$pull": {"upload_ids_charged": upload_id}},
+    )
+
+
 async def get_quota_status(
     user_email: str,
     now: Optional[datetime] = None,

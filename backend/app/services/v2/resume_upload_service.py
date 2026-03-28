@@ -27,6 +27,8 @@ _client: AsyncIOMotorClient = _get_mongo_client()
 _db = _client.jobs_db
 _collection: AsyncIOMotorCollection = _db[RESUME_UPLOADS_COLLECTION]
 _recommendations_collection: AsyncIOMotorCollection = _db[RECOMMENDATIONS_COLLECTION]
+_match_coach_cache_collection: AsyncIOMotorCollection = _db["match_coach_cache"]
+_resumes_collection: AsyncIOMotorCollection = _db["resumes"]
 _logger = get_v2_logger("resume_v2.service.uploads")
 _upload_dedupe_index_ensured = False
 
@@ -296,6 +298,29 @@ async def add_activity_event(
         },
     )
     return result.matched_count == 1
+
+
+async def delete_match_coach_cache_for_upload(upload_id: str) -> int:
+    result = await _match_coach_cache_collection.delete_many({"upload_id": upload_id})
+    n = int(result.deleted_count)
+    if n:
+        _logger.info("Deleted %s match_coach_cache doc(s) for upload_id=%s", n, upload_id)
+    return n
+
+
+async def delete_resume_for_upload(resume_id: Any) -> bool:
+    if not resume_id:
+        return False
+    try:
+        oid = resume_id if isinstance(resume_id, ObjectId) else ObjectId(str(resume_id))
+    except Exception as exc:
+        _logger.warning("delete_resume_for_upload invalid resume_id=%s err=%s", resume_id, exc)
+        return False
+    result = await _resumes_collection.delete_one({"_id": oid})
+    if result.deleted_count == 1:
+        _logger.info("Deleted resume _id=%s", oid)
+        return True
+    return False
 
 
 async def delete_upload(upload_id: str) -> bool:

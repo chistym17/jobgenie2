@@ -13,7 +13,7 @@ from app.models.v2.upload_models import (
     UploadListItem,
     StartRecommendationsResponse,
 )
-from app.services.v2 import resume_upload_service, quota_service
+from app.services.v2 import resume_upload_service, quota_service, recommendation_service
 from app.utils.logger_v2 import get_v2_logger
 
 
@@ -275,6 +275,16 @@ async def delete_upload(upload_id: str):
     doc = await resume_upload_service.get_upload(upload_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Upload not found")
+
+    user_email = doc.get("user_email")
+    await recommendation_service.delete_recommendations_for_upload(upload_id)
+    await resume_upload_service.delete_match_coach_cache_for_upload(upload_id)
+    if user_email:
+        await quota_service.release_upload_quota_slot(user_email, upload_id)
+
+    resume_id = doc.get("resume_id")
+    if resume_id:
+        await resume_upload_service.delete_resume_for_upload(resume_id)
 
     file_id = doc.get("file_path")
     if file_id:
