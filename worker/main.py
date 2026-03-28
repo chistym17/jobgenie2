@@ -1,11 +1,11 @@
-from fastapi import FastAPI, WebSocket, Request, HTTPException
+from fastapi import FastAPI, WebSocket, Request, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import json
 from services.explainer_service import ExplainerService
 from services.resume_advisor_service import ResumeAdvisorService
 from services.match_coach_service import MatchCoachService
-from db import fetch_resume_data, fetch_resume_data_by_upload_id
+from db import fetch_resume_data, fetch_resume_data_by_upload_id, get_mongodb_client
 import datetime
 from db import check_mongodb_connection
 from utils.qdrant_service import check_qdrant_connection
@@ -13,6 +13,13 @@ from celery_tasks.recommendation_task import generate_recommendations_task
 from celery_tasks.precompute_embedding import precompute_resume_embedding_task
 from celery.result import AsyncResult
 from celery_app import celery_app
+from bson import ObjectId
+from utils.quota_service import can_consume_coach_call, consume_coach_call_success
+from utils.match_coach_cache import (
+    coach_key_from_job,
+    get_cached_match_coach,
+    save_match_coach_cache,
+)
 
 app = FastAPI()
 
@@ -125,17 +132,75 @@ async def match_coach(request: Request):
         if not user_resume:
             raise HTTPException(status_code=404, detail="Resume not found for upload")
 
+        client = get_mongodb_client()
+        try:
+            db = client["jobs_db"]
+            uploads = db["resume_uploads"]
+            upload_doc = uploads.find_one({"_id": ObjectId(upload_id)})
+        finally:
+            client.close()
+
+        user_email = upload_doc.get("user_email") if upload_doc else None
+        if not user_email:
+            raise HTTPException(status_code=404, detail="User not found for upload")
+
+        coach_key = coach_key_from_job(job)
+
+        cached = get_cached_match_coach(upload_id, coach_key)
+        if cached:
+            return {
+                "upload_id": upload_id,
+                "why_good_match": cached["why_good_match"],
+                "improvements": cached["improvements"],
+                "cached": True,
+            }
+
+        can_consume, meta = can_consume_coach_call(user_email, coach_key)
+        if not can_consume:
+            raise HTTPException(
+                status_code=429,
+                detail="Daily coach quota exceeded for today. Try again tomorrow.",
+            )
+
         service = MatchCoachService()
         result = service.explain_and_improve(job, user_resume)
+
+        save_match_coach_cache(
+            upload_id,
+            coach_key,
+            user_email,
+            result["why_good_match"],
+            result["improvements"],
+        )
+        consume_coach_call_success(user_email, coach_key)
         return {
             "upload_id": upload_id,
             "why_good_match": result["why_good_match"],
             "improvements": result["improvements"],
+            "cached": False,
         }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/match-coach/cache")
+async def match_coach_cache_get(
+    upload_id: str = Query(...),
+    job_id: str = Query(...),
+):
+    if not upload_id.strip() or not job_id.strip():
+        raise HTTPException(status_code=400, detail="upload_id and job_id are required")
+    coach_key = str(job_id)
+    cached = get_cached_match_coach(upload_id, coach_key)
+    if not cached:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {
+        "why_good_match": cached["why_good_match"],
+        "improvements": cached["improvements"],
+        "cached": True,
+    }
 
 
 @app.websocket("/ws/chat")

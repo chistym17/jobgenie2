@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Briefcase, Link2, Sparkles } from "lucide-react";
 import Navbar from "../../../components/v2/Navbar";
 import { useSearchParams } from "next/navigation";
+import { useCurrentUser } from "../../../hooks/useCurrentUser";
+import { useQuotaStatus } from "../../../hooks/useQuotaStatus";
 
 type Recommendation = {
   id: string;
@@ -148,6 +150,9 @@ function Pill(props: { children: ReactNode; className?: string }) {
 
 export default function RecommendationsPreviewPage() {
   const searchParams = useSearchParams();
+  const { user } = useCurrentUser();
+  const userEmail = user?.email || null;
+  const { quota, isLoading: isQuotaLoading, refetch: refetchQuota } = useQuotaStatus(userEmail);
   const uploadId = searchParams.get("upload_id");
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(!!uploadId);
   const workerBase = (process.env.NEXT_PUBLIC_WORKER_URL || "").replace(/\/$/, "");
@@ -169,6 +174,7 @@ export default function RecommendationsPreviewPage() {
   const [coachPanelOpen, setCoachPanelOpen] = useState(false);
   const [coachResult, setCoachResult] = useState<MatchCoachResult | null>(null);
   const [coachLoading, setCoachLoading] = useState(false);
+  const [coachPrefetching, setCoachPrefetching] = useState(false);
   const [coachError, setCoachError] = useState("");
   const coachCacheRef = useRef<Record<string, MatchCoachResult>>({});
 
@@ -199,6 +205,58 @@ export default function RecommendationsPreviewPage() {
     setCoachResult(null);
     setCoachError("");
   }, [selected, uploadId]);
+
+  useEffect(() => {
+    if (!selected || !uploadId || !workerBase || !coachPanelOpen) {
+      setCoachPrefetching(false);
+      return;
+    }
+    const key = `${uploadId}:${selected.id}`;
+    if (coachCacheRef.current[key]) {
+      setCoachResult(coachCacheRef.current[key]);
+      setCoachError("");
+      setCoachPrefetching(false);
+      return;
+    }
+    const ac = new AbortController();
+    setCoachPrefetching(true);
+    (async () => {
+      try {
+        const res = await fetch(
+          `${workerBase}/match-coach/cache?upload_id=${encodeURIComponent(uploadId)}&job_id=${encodeURIComponent(selected.id)}`,
+          { signal: ac.signal }
+        );
+        if (res.status === 404) {
+          if (!ac.signal.aborted) {
+            setCoachResult(null);
+            setCoachError("");
+          }
+          return;
+        }
+        if (!res.ok) return;
+        const data = await res.json();
+        const nextResult: MatchCoachResult = {
+          why_good_match: normalizeCoachBullets(data?.why_good_match),
+          improvements: normalizeCoachBullets(data?.improvements),
+        };
+        if (!nextResult.why_good_match.length || !nextResult.improvements.length) return;
+        coachCacheRef.current[key] = nextResult;
+        if (!ac.signal.aborted) {
+          setCoachResult(nextResult);
+          setCoachError("");
+        }
+      } catch {
+        if (!ac.signal.aborted) {
+          setCoachResult(null);
+        }
+      } finally {
+        if (!ac.signal.aborted) setCoachPrefetching(false);
+      }
+    })();
+    return () => {
+      ac.abort();
+    };
+  }, [selected?.id, uploadId, workerBase, coachPanelOpen]);
 
   const totalPages = Math.max(
     1,
@@ -413,6 +471,9 @@ export default function RecommendationsPreviewPage() {
       }
       coachCacheRef.current[key] = nextResult;
       setCoachResult(nextResult);
+      if (!data?.cached) {
+        refetchQuota();
+      }
     } catch (err: any) {
       setCoachError(err.message || "Failed to load match coach response");
     } finally {
@@ -717,17 +778,38 @@ export default function RecommendationsPreviewPage() {
                 </div>
               </div>
               <p className="text-brand-muted text-sm leading-relaxed">
-                Use match coach to understand why this role fits your profile and what to change
-                in your resume or cover letter before you apply.
+                {coachResult
+                  ? "Saved insight for this role and your resume."
+                  : "Use match coach to understand why this role fits your profile and what to change in your resume or cover letter before you apply."}
               </p>
-              <button
-                type="button"
-                onClick={handleExplainAndImprove}
-                disabled={coachLoading}
-                className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold border border-white/10 bg-brand-primary-soft text-brand-primary hover:bg-brand-primary hover:text-brand-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {coachLoading ? "Analyzing..." : "Explain + Improve"}
-              </button>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-brand-muted uppercase tracking-wide">Coach quota</span>
+                  <span className="text-white font-medium">
+                    {isQuotaLoading ? "..." : `${quota?.coach_used ?? 0}/${quota?.coach_limit ?? 3}`}
+                  </span>
+                </div>
+              </div>
+              {coachPrefetching && !coachResult && (
+                <div className="text-xs text-brand-muted">Loading saved insight…</div>
+              )}
+              {!coachResult && !coachPrefetching && (
+                <button
+                  type="button"
+                  onClick={handleExplainAndImprove}
+                  disabled={
+                    coachLoading || (quota?.coach_used ?? 0) >= (quota?.coach_limit ?? 3)
+                  }
+                  className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold border border-white/10 bg-brand-primary-soft text-brand-primary hover:bg-brand-primary hover:text-brand-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {coachLoading ? "Analyzing..." : "Explain + Improve"}
+                </button>
+              )}
+              {(quota?.coach_used ?? 0) >= (quota?.coach_limit ?? 3) && (
+                <div className="text-xs text-amber-300">
+                  Daily coach limit reached. Try again tomorrow.
+                </div>
+              )}
               {(coachLoading || coachError || coachResult) && (
                 <AgentPanel
                   title="Insights"

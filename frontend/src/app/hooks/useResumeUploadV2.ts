@@ -27,7 +27,12 @@ export function useResumeUploadV2() {
     }
 
     const data = await response.json();
-    return data as { upload_id: string; parse_task_id: string; status: string };
+    return data as {
+      upload_id: string;
+      parse_task_id: string;
+      status: string;
+      message: string;
+    };
   };
 
   return {

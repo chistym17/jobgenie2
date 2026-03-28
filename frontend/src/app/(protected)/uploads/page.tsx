@@ -13,7 +13,8 @@ import { useDeleteUpload } from "../../hooks/useDeleteUpload";
 import { useNotifications } from "../../hooks/useNotifications";
 import { useResumeUploadV2 } from "../../hooks/useResumeUploadV2";
 import { useRecommendationHistory } from "../../hooks/useRecommendationHistory";
-import ToastContainer from "../../components/v2/ToastContainer";
+import { useQuotaStatus } from "../../hooks/useQuotaStatus";
+import ToastContainer, { type ToastData } from "../../components/v2/ToastContainer";
 import NotificationItem from "../../components/v2/NotificationItem";
 import {
   UploadHistorySkeleton,
@@ -79,11 +80,15 @@ interface NewUploadTabProps {
   setUploading: (uploading: boolean) => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   userEmail: string | null;
-  uploadResume: (file: File, userEmail: string) => Promise<{ upload_id: string }>;
+  uploadResume: (
+    file: File,
+    userEmail: string
+  ) => Promise<{ upload_id: string; parse_task_id: string; status: string; message: string }>;
   isUploading: boolean;
   router: ReturnType<typeof useRouter>;
   setActiveTab: (tab: "history" | "new" | "recommendations" | "notifications") => void;
   refetchHistory: () => void;
+  onDuplicateFileReuse: (message: string) => void;
 }
 
 function NewUploadTab({
@@ -98,6 +103,7 @@ function NewUploadTab({
   router,
   setActiveTab,
   refetchHistory,
+  onDuplicateFileReuse,
 }: NewUploadTabProps) {
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -138,7 +144,9 @@ function NewUploadTab({
       const data = await uploadResume(file, userEmail);
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      // Switch to history tab and refresh
+      if (data.status === "completed" && !data.parse_task_id) {
+        onDuplicateFileReuse(data.message || "This file was already processed.");
+      }
       setActiveTab("history");
       refetchHistory();
       router.push(`/uploads?upload_id=${data.upload_id}`);
@@ -382,6 +390,7 @@ export default function ResumeUploadsDashboard() {
   const focusedUploadId = searchParams.get("upload_id");
   const { user } = useCurrentUser();
   const userEmail = user?.email || null;
+  const { quota, isLoading: isQuotaLoading, refetch: refetchQuota } = useQuotaStatus(userEmail);
   const { items: historyItems, isLoading: isHistoryLoading, refetch: refetchHistory } = useUploadHistory(userEmail);
   const {
     items: recommendationHistoryItems,
@@ -406,6 +415,18 @@ export default function ResumeUploadsDashboard() {
   const [deleteConfirmUploadId, setDeleteConfirmUploadId] = useState<string | null>(null);
   const [deleteConfirmRecommendationId, setDeleteConfirmRecommendationId] = useState<string | null>(null);
   const { notifications, toasts, removeToast } = useNotifications(focusedUploadId, focusedStatus, focusedErrorMessage);
+  const [extraToasts, setExtraToasts] = useState<ToastData[]>([]);
+  const mergedToasts = useMemo(() => [...toasts, ...extraToasts], [toasts, extraToasts]);
+  const handleToastClose = (id: string) => {
+    removeToast(id);
+    setExtraToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+  const handleDuplicateFileReuse = (message: string) => {
+    setExtraToasts((prev) => [
+      ...prev,
+      { id: `dup-${crypto.randomUUID()}`, message, type: "info" },
+    ]);
+  };
 
   const redirectInFlightRef = useRef(false);
   useEffect(() => {
@@ -447,8 +468,9 @@ export default function ResumeUploadsDashboard() {
   useEffect(() => {
     if (focusedStatus === "completed" || focusedStatus === "recommendations") {
       refetchRecommendationHistory();
+      refetchQuota();
     }
-  }, [focusedStatus, refetchRecommendationHistory]);
+  }, [focusedStatus, refetchRecommendationHistory, refetchQuota]);
   
   // Upload state
   const [file, setFile] = useState<File | null>(null);
@@ -572,6 +594,28 @@ export default function ResumeUploadsDashboard() {
                 )}
               </button>
             </nav>
+            {!isSidebarCollapsed && (
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
+                <div className="text-[11px] uppercase tracking-wide text-brand-muted">Daily quota</div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-brand-muted">Uploads</span>
+                  <span className="text-white font-medium">
+                    {isQuotaLoading ? "..." : `${quota?.uploads_used ?? 0}/${quota?.uploads_limit ?? 3}`}
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full bg-brand-primary rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        Math.round((((quota?.uploads_used ?? 0) / Math.max(1, quota?.uploads_limit ?? 3)) * 100))
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </aside>
 
@@ -759,6 +803,7 @@ export default function ResumeUploadsDashboard() {
                   router={router}
                   setActiveTab={setActiveTab}
                   refetchHistory={refetchHistory}
+                  onDuplicateFileReuse={handleDuplicateFileReuse}
                 />
               )}
 
@@ -880,7 +925,7 @@ export default function ResumeUploadsDashboard() {
         </main>
       </div>
 
-      <ToastContainer toasts={toasts} onClose={removeToast} />
+      <ToastContainer toasts={mergedToasts} onClose={handleToastClose} />
 
       <ConfirmationModal
         isOpen={!!deleteConfirmUploadId}

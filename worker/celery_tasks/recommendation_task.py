@@ -10,6 +10,10 @@ from utils.recommendation_storage import (
 )
 from db import get_mongodb_client
 from bson import ObjectId
+from utils.quota_service import (
+    can_consume_upload_completion,
+    consume_upload_completion_success,
+)
 
 
 logger = get_v2_logger("resume_v2.worker.recommend")
@@ -28,19 +32,27 @@ def generate_recommendations_task(user_email: str, upload_id: str | None = None,
                     recommendations = existing.get("recommendations", [])
                     if upload_id:
                         update_upload_status(upload_id, "completed")
+                        consume_upload_completion_success(user_email, upload_id)
                     return recommendations
+
+            if upload_id:
+                allowed, meta = can_consume_upload_completion(user_email, upload_id)
+                if not allowed:
+                    sanitized = sanitize_error_message("Daily upload quota exceeded")
+                    update_upload_status(upload_id, "failed", error_message=sanitized)
+                    add_activity_event(upload_id, "Quota Exceeded", "Daily resume quota exceeded. Try again tomorrow.", "failed", sanitized)
+                    logger.warning(
+                        "Upload quota exceeded for user_email=%s upload_id=%s meta=%s",
+                        user_email,
+                        upload_id,
+                        meta,
+                    )
+                    return []
         
         service = RecommenderService()
         recommendations = service.generate_recommendations(user_email)
 
-        if upload_id and not recommendations:
-            sanitized = sanitize_error_message("No recommendations generated")
-            update_upload_status(upload_id, "failed", error_message=sanitized)
-            add_activity_event(upload_id, "Processing Failed", "No job recommendations could be generated", "failed", sanitized)
-            logger.error("No recommendations returned for upload_id=%s user_email=%s", upload_id, user_email)
-            return []
-
-        if upload_id and recommendations:
+        if upload_id:
             client = get_mongodb_client()
             try:
                 db = client["jobs_db"]
@@ -49,20 +61,26 @@ def generate_recommendations_task(user_email: str, upload_id: str | None = None,
                 resume_id = str(upload_doc.get("resume_id", "")) if upload_doc and upload_doc.get("resume_id") else None
             finally:
                 client.close()
-            
+
             recommendation_id = save_recommendations(
                 upload_id=upload_id,
                 user_email=user_email,
                 recommendations=recommendations,
                 resume_id=resume_id,
             )
-            
+
             update_upload_with_recommendation_id(upload_id, recommendation_id)
             logger.info("Saved recommendations: recommendation_id=%s upload_id=%s", recommendation_id, upload_id)
         
         if upload_id:
             update_upload_status(upload_id, "completed")
-            add_activity_event(upload_id, "Recommendations Ready", "Your personalized job recommendations are ready!", "completed")
+            event_message = (
+                "Your personalized job recommendations are ready!"
+                if recommendations
+                else "No job recommendations could be generated for this resume yet."
+            )
+            add_activity_event(upload_id, "Recommendations Ready", event_message, "completed")
+            consume_upload_completion_success(user_email, upload_id)
             logger.info("Recommendations completed for upload_id=%s user_email=%s", upload_id, user_email)
         return recommendations
     except Exception as e:

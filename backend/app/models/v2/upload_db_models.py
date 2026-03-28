@@ -36,6 +36,7 @@ class ResumeUpload(BaseModel):
     file_path: str
     file_name: str
     file_size: int
+    file_content_hash: Optional[str] = None
 
     status: str = Field(default=UploadStatus.PENDING)
 

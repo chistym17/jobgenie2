@@ -12,7 +12,7 @@ from app.models.v2.upload_models import (
     UploadHistoryResponse,
     UploadListItem,
 )
-from app.services.v2 import resume_upload_service
+from app.services.v2 import resume_upload_service, quota_service
 from app.utils.logger_v2 import get_v2_logger
 
 
@@ -156,6 +156,13 @@ async def list_uploads(
         limit=result["limit"],
         offset=result["offset"],
     )
+
+
+@router.get("/quota/status")
+async def get_quota_status(
+    user_email: str = Query(...),
+):
+    return await quota_service.get_quota_status(user_email=user_email)
 
 
 @router.get("/upload/{upload_id}/activity")
