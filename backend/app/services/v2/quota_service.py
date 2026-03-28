@@ -76,6 +76,36 @@ async def ensure_quota_indexes() -> None:
     _logger.info("Ensured indexes on %s", USER_DAILY_QUOTA_COLLECTION)
 
 
+async def can_consume_upload_completion(
+    user_email: str,
+    upload_id: str,
+    now: Optional[datetime] = None,
+) -> Tuple[bool, Dict[str, Any]]:
+    await ensure_quota_indexes()
+    coll = _get_collection()
+    date_key = utc_date_key(now)
+    doc = await coll.find_one({"user_email": user_email, "date_key": date_key})
+    ids = list(doc.get("upload_ids_charged") or []) if doc else []
+    limit = _daily_upload_limit()
+    if upload_id in ids:
+        return True, {
+            "uploads_used": len(ids),
+            "uploads_limit": limit,
+            "date_key": date_key,
+        }
+    if len(ids) < limit:
+        return True, {
+            "uploads_used": len(ids),
+            "uploads_limit": limit,
+            "date_key": date_key,
+        }
+    return False, {
+        "uploads_used": len(ids),
+        "uploads_limit": limit,
+        "date_key": date_key,
+    }
+
+
 async def try_consume_upload_completion(
     user_email: str,
     upload_id: str,

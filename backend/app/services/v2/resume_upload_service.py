@@ -172,6 +172,42 @@ async def update_status(
     return result.matched_count == 1
 
 
+async def claim_recommendations_start(
+    upload_id: str,
+    user_email: str,
+    recommendation_task_id: str,
+) -> bool:
+    try:
+        oid = ObjectId(upload_id)
+    except Exception as exc:
+        _logger.error("Invalid upload_id in claim_recommendations_start: %s err=%s", upload_id, exc)
+        return False
+
+    doc = await _collection.find_one({"_id": oid})
+    if not doc or doc.get("user_email") != user_email:
+        return False
+    st = doc.get("status")
+    if st == UploadStatus.EMBEDDING_COMPLETED:
+        pass
+    elif st == UploadStatus.FAILED and doc.get("resume_id"):
+        pass
+    else:
+        return False
+
+    result = await _collection.update_one(
+        {"_id": oid, "user_email": user_email, "status": st},
+        {
+            "$set": {
+                "status": UploadStatus.RECOMMENDATIONS,
+                "recommendation_task_id": recommendation_task_id,
+                "updated_at": datetime.utcnow(),
+                "error_message": None,
+            }
+        },
+    )
+    return result.modified_count == 1
+
+
 async def get_upload(upload_id: str) -> Optional[Dict[str, Any]]:
     doc = await _collection.find_one({"_id": ObjectId(upload_id)})
     if not doc:

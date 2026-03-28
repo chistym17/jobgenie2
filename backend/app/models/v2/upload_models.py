@@ -45,4 +45,11 @@ class UploadHistoryResponse(BaseModel):
     offset: int
 
 
+class StartRecommendationsResponse(BaseModel):
+    upload_id: str
+    status: str
+    task_id: Optional[str] = None
+    message: Optional[str] = None
+
+
 

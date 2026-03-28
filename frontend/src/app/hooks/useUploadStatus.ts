@@ -27,7 +27,11 @@ const TERMINAL_UPLOAD_STATUSES = new Set([
   "embedding_failed",
 ]);
 
-export function useUploadStatus(uploadId: string | null, enabled: boolean) {
+export function useUploadStatus(
+  uploadId: string | null,
+  enabled: boolean,
+  refreshNonce: number = 0
+) {
   const [status, setStatus] = useState<UploadStatusValue | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,7 +61,11 @@ export function useUploadStatus(uploadId: string | null, enabled: boolean) {
         setStatus(data.status);
         setErrorMessage(data.error_message || null);
         setError(null);
-        if (TERMINAL_UPLOAD_STATUSES.has(String(data.status))) {
+        const st = String(data.status);
+        if (
+          TERMINAL_UPLOAD_STATUSES.has(st) ||
+          st === "embedding_completed"
+        ) {
           return;
         }
         setTimeout(poll, 2000);
@@ -76,7 +84,7 @@ export function useUploadStatus(uploadId: string | null, enabled: boolean) {
     return () => {
       cancelled = true;
     };
-  }, [uploadId, enabled, backendV2Base]);
+  }, [uploadId, enabled, backendV2Base, refreshNonce]);
 
   return {
     status,

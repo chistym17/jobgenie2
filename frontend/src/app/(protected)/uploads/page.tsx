@@ -61,6 +61,21 @@ const statusConfig: Record<
     className: "bg-amber-500/10 text-amber-300 border border-amber-500/40",
     icon: <Clock className="h-3.5 w-3.5" />,
   },
+  embedding_completed: {
+    label: "Resume ready",
+    className: "bg-sky-500/10 text-sky-300 border border-sky-500/40",
+    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+  },
+  recommendations: {
+    label: "Matching jobs",
+    className: "bg-amber-500/10 text-amber-300 border border-amber-500/40",
+    icon: <Sparkles className="h-3.5 w-3.5" />,
+  },
+  embedding_failed: {
+    label: "Failed",
+    className: "bg-red-500/10 text-red-300 border border-red-500/40",
+    icon: <AlertTriangle className="h-3.5 w-3.5" />,
+  },
   failed: {
     label: "Failed",
     className: "bg-red-500/10 text-red-300 border border-red-500/40",
@@ -400,11 +415,13 @@ export default function ResumeUploadsDashboard() {
     refetch: refetchRecommendationHistory,
     deleteRecommendation,
   } = useRecommendationHistory(userEmail);
+  const [statusNonce, setStatusNonce] = useState(0);
+  const [startingRecFor, setStartingRecFor] = useState<string | null>(null);
   const {
     status: focusedStatus,
     errorMessage: focusedErrorMessage,
     isLoading: isFocusedStatusLoading,
-  } = useUploadStatus(focusedUploadId, !!focusedUploadId);
+  } = useUploadStatus(focusedUploadId, !!focusedUploadId, statusNonce);
   const [detailUploadId, setDetailUploadId] = useState<string | null>(null);
   const {
     data: detail,
@@ -426,6 +443,55 @@ export default function ResumeUploadsDashboard() {
       ...prev,
       { id: `dup-${crypto.randomUUID()}`, message, type: "info" },
     ]);
+  };
+
+  const startRecommendationsForUpload = async (uploadId: string) => {
+    if (!userEmail) return;
+    const backendV2Base = (process.env.NEXT_PUBLIC_BACKEND_URL || "").replace("/api/v1", "/api/v2");
+    if (!backendV2Base) {
+      setExtraToasts((prev) => [
+        ...prev,
+        { id: `rec-${crypto.randomUUID()}`, message: "Backend URL is not configured.", type: "error" },
+      ]);
+      return;
+    }
+    setStartingRecFor(uploadId);
+    try {
+      const res = await fetch(
+        `${backendV2Base}/resume/upload/${encodeURIComponent(uploadId)}/recommendations?user_email=${encodeURIComponent(userEmail)}`,
+        { method: "POST" }
+      );
+      const payload = (await res.json().catch(() => ({}))) as {
+        detail?: unknown;
+        message?: string;
+      };
+      if (!res.ok) {
+        const d = payload?.detail;
+        let msg = "Failed to start recommendations";
+        if (typeof d === "string") msg = d;
+        else if (Array.isArray(d) && d[0] && typeof d[0] === "object" && d[0] !== null && "msg" in d[0]) {
+          msg = String((d[0] as { msg: string }).msg);
+        }
+        throw new Error(msg);
+      }
+      refetchHistory();
+      refetchQuota();
+      setStatusNonce((n) => n + 1);
+      setExtraToasts((prev) => [
+        ...prev,
+        {
+          id: `rec-ok-${crypto.randomUUID()}`,
+          message: payload?.message || "Finding job matches for your profile.",
+          type: "info",
+          durationMs: 4000,
+        },
+      ]);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to start recommendations";
+      setExtraToasts((prev) => [...prev, { id: `rec-err-${crypto.randomUUID()}`, message: msg, type: "error" }]);
+    } finally {
+      setStartingRecFor(null);
+    }
   };
 
   const redirectInFlightRef = useRef(false);
@@ -689,6 +755,19 @@ export default function ResumeUploadsDashboard() {
                               {cfg.icon}
                               <span>{cfg.label}</span>
                             </span>
+                            {(effectiveStatus === "embedding_completed" || effectiveStatus === "failed") && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startRecommendationsForUpload(upload.upload_id);
+                                }}
+                                disabled={startingRecFor === upload.upload_id}
+                                className="inline-flex items-center justify-center text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-brand-primary text-brand-ink hover:bg-brand-primary-soft disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap shrink-0 w-auto max-w-[9.5rem]"
+                              >
+                                {startingRecFor === upload.upload_id ? "Starting…" : "Create recommendations"}
+                              </button>
+                            )}
                             <button
                               onClick={() => setDetailUploadId(upload.upload_id)}
                               className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full border border-white/10 text-brand-muted hover:text-brand-ink hover:bg-brand-primary transition-colors"
@@ -813,11 +892,43 @@ export default function ResumeUploadsDashboard() {
                     Your recommendations
                   </h2>
 
-                  {(focusedStatus === "embedding" || focusedStatus === "embedding_completed") && (
+                  {focusedStatus === "embedding" && (
                     <div className="rounded-2xl border border-brand-secondary/40 bg-brand-secondary-soft px-5 py-4 mb-6 flex items-start gap-3">
                       <Sparkles className="h-5 w-5 text-brand-secondary mt-0.5" />
                       <div>
-                        <p className="text-sm text-white font-medium">Preparing new recommendations...</p>
+                        <p className="text-sm text-white font-medium">Creating resume embeddings…</p>
+                        <p className="text-xs text-brand-muted mt-1">
+                          Your previous recommendation sets are still available below.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {focusedStatus === "embedding_completed" && focusedUploadId && userEmail && (
+                    <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 px-5 py-4 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <CheckCircle2 className="h-5 w-5 text-sky-300 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-sm text-white font-medium">Resume ready</p>
+                          <p className="text-xs text-brand-muted mt-1">
+                            Create job recommendations when you are ready. This uses your daily recommendation quota when it succeeds.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => startRecommendationsForUpload(focusedUploadId)}
+                        disabled={startingRecFor === focusedUploadId}
+                        className="inline-flex items-center justify-center text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-brand-primary text-brand-ink hover:bg-brand-primary-soft disabled:opacity-50 shrink-0 whitespace-nowrap w-auto max-w-[9.5rem]"
+                      >
+                        {startingRecFor === focusedUploadId ? "Starting…" : "Create recommendations"}
+                      </button>
+                    </div>
+                  )}
+                  {focusedStatus === "recommendations" && (
+                    <div className="rounded-2xl border border-brand-secondary/40 bg-brand-secondary-soft px-5 py-4 mb-6 flex items-start gap-3">
+                      <Sparkles className="h-5 w-5 text-brand-secondary mt-0.5" />
+                      <div>
+                        <p className="text-sm text-white font-medium">Generating recommendations…</p>
                         <p className="text-xs text-brand-muted mt-1">
                           Your previous recommendation sets are still available below.
                         </p>
