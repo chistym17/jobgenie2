@@ -8,6 +8,7 @@ from app.models.v2.upload_models import UploadResumeResponse
 from app.models.v2.upload_db_models import UploadStatus
 from app.services.v2.file_storage_service import FileStorageService
 from app.services.v2 import resume_upload_service
+from app.services.v2 import quota_service
 from app.utils.logger_v2 import get_v2_logger
 
 
@@ -25,6 +26,25 @@ async def upload_resume_v2(
     if not file.filename.lower().endswith(".pdf"):
         logger.warning("Rejected non-PDF upload for user=%s, filename=%s", user_email, file.filename)
         raise HTTPException(status_code=400, detail="Only PDF files are supported in v2.")
+
+    quota = await quota_service.get_quota_status(user_email=user_email)
+    if quota.get("uploads_used", 0) >= quota.get("uploads_limit", 3):
+        date_key = quota.get("date_key")
+        resets_at = None
+        if isinstance(date_key, str) and len(date_key) == 10:
+            try:
+                from datetime import datetime, timedelta, timezone
+
+                today = datetime.strptime(date_key, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                resets_at = (today + timedelta(days=1)).isoformat()
+            except Exception:
+                resets_at = None
+
+        detail = "Daily upload quota exceeded. Try again tomorrow."
+        if resets_at:
+            detail = f"{detail} Resets at {resets_at}."
+        logger.info("Upload blocked by quota for user=%s uploads_used=%s", user_email, quota.get("uploads_used"))
+        raise HTTPException(status_code=429, detail=detail)
 
     storage = FileStorageService()
     file_id = await storage.save_file(file, user_email=user_email)

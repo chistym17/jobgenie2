@@ -5,7 +5,7 @@ import json
 from services.explainer_service import ExplainerService
 from services.resume_advisor_service import ResumeAdvisorService
 from services.match_coach_service import MatchCoachService
-from db import fetch_resume_data, fetch_resume_data_by_upload_id
+from db import fetch_resume_data, fetch_resume_data_by_upload_id, get_mongodb_client
 import datetime
 from db import check_mongodb_connection
 from utils.qdrant_service import check_qdrant_connection
@@ -13,6 +13,8 @@ from celery_tasks.recommendation_task import generate_recommendations_task
 from celery_tasks.precompute_embedding import precompute_resume_embedding_task
 from celery.result import AsyncResult
 from celery_app import celery_app
+from bson import ObjectId
+from utils.quota_service import can_consume_coach_call, consume_coach_call_success
 
 app = FastAPI()
 
@@ -125,8 +127,32 @@ async def match_coach(request: Request):
         if not user_resume:
             raise HTTPException(status_code=404, detail="Resume not found for upload")
 
+        client = get_mongodb_client()
+        try:
+            db = client["jobs_db"]
+            uploads = db["resume_uploads"]
+            upload_doc = uploads.find_one({"_id": ObjectId(upload_id)})
+        finally:
+            client.close()
+
+        user_email = upload_doc.get("user_email") if upload_doc else None
+        if not user_email:
+            raise HTTPException(status_code=404, detail="User not found for upload")
+
+        job_id = job.get("job_id") or job.get("jobId") or job.get("id") or ""
+        coach_key = str(job_id) if job_id else f"{job.get('title','')}|{job.get('company','')}"
+
+        can_consume, meta = can_consume_coach_call(user_email, coach_key)
+        if not can_consume:
+            raise HTTPException(
+                status_code=429,
+                detail="Daily coach quota exceeded for today. Try again tomorrow.",
+            )
+
         service = MatchCoachService()
         result = service.explain_and_improve(job, user_resume)
+
+        consume_coach_call_success(user_email, coach_key)
         return {
             "upload_id": upload_id,
             "why_good_match": result["why_good_match"],

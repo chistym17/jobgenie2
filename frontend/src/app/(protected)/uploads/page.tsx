@@ -13,6 +13,7 @@ import { useDeleteUpload } from "../../hooks/useDeleteUpload";
 import { useNotifications } from "../../hooks/useNotifications";
 import { useResumeUploadV2 } from "../../hooks/useResumeUploadV2";
 import { useRecommendationHistory } from "../../hooks/useRecommendationHistory";
+import { useQuotaStatus } from "../../hooks/useQuotaStatus";
 import ToastContainer from "../../components/v2/ToastContainer";
 import NotificationItem from "../../components/v2/NotificationItem";
 import {
@@ -382,6 +383,7 @@ export default function ResumeUploadsDashboard() {
   const focusedUploadId = searchParams.get("upload_id");
   const { user } = useCurrentUser();
   const userEmail = user?.email || null;
+  const { quota, isLoading: isQuotaLoading, refetch: refetchQuota } = useQuotaStatus(userEmail);
   const { items: historyItems, isLoading: isHistoryLoading, refetch: refetchHistory } = useUploadHistory(userEmail);
   const {
     items: recommendationHistoryItems,
@@ -447,8 +449,9 @@ export default function ResumeUploadsDashboard() {
   useEffect(() => {
     if (focusedStatus === "completed" || focusedStatus === "recommendations") {
       refetchRecommendationHistory();
+      refetchQuota();
     }
-  }, [focusedStatus, refetchRecommendationHistory]);
+  }, [focusedStatus, refetchRecommendationHistory, refetchQuota]);
   
   // Upload state
   const [file, setFile] = useState<File | null>(null);
@@ -572,6 +575,28 @@ export default function ResumeUploadsDashboard() {
                 )}
               </button>
             </nav>
+            {!isSidebarCollapsed && (
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
+                <div className="text-[11px] uppercase tracking-wide text-brand-muted">Daily quota</div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-brand-muted">Uploads</span>
+                  <span className="text-white font-medium">
+                    {isQuotaLoading ? "..." : `${quota?.uploads_used ?? 0}/${quota?.uploads_limit ?? 3}`}
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full bg-brand-primary rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        Math.round((((quota?.uploads_used ?? 0) / Math.max(1, quota?.uploads_limit ?? 3)) * 100))
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </aside>
 

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Briefcase, Link2, Sparkles } from "lucide-react";
 import Navbar from "../../../components/v2/Navbar";
 import { useSearchParams } from "next/navigation";
+import { useCurrentUser } from "../../../hooks/useCurrentUser";
+import { useQuotaStatus } from "../../../hooks/useQuotaStatus";
 
 type Recommendation = {
   id: string;
@@ -148,6 +150,9 @@ function Pill(props: { children: ReactNode; className?: string }) {
 
 export default function RecommendationsPreviewPage() {
   const searchParams = useSearchParams();
+  const { user } = useCurrentUser();
+  const userEmail = user?.email || null;
+  const { quota, isLoading: isQuotaLoading, refetch: refetchQuota } = useQuotaStatus(userEmail);
   const uploadId = searchParams.get("upload_id");
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(!!uploadId);
   const workerBase = (process.env.NEXT_PUBLIC_WORKER_URL || "").replace(/\/$/, "");
@@ -413,6 +418,7 @@ export default function RecommendationsPreviewPage() {
       }
       coachCacheRef.current[key] = nextResult;
       setCoachResult(nextResult);
+      refetchQuota();
     } catch (err: any) {
       setCoachError(err.message || "Failed to load match coach response");
     } finally {
@@ -720,14 +726,27 @@ export default function RecommendationsPreviewPage() {
                 Use match coach to understand why this role fits your profile and what to change
                 in your resume or cover letter before you apply.
               </p>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-brand-muted uppercase tracking-wide">Coach quota</span>
+                  <span className="text-white font-medium">
+                    {isQuotaLoading ? "..." : `${quota?.coach_used ?? 0}/${quota?.coach_limit ?? 3}`}
+                  </span>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={handleExplainAndImprove}
-                disabled={coachLoading}
+                disabled={coachLoading || ((quota?.coach_used ?? 0) >= (quota?.coach_limit ?? 3))}
                 className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold border border-white/10 bg-brand-primary-soft text-brand-primary hover:bg-brand-primary hover:text-brand-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {coachLoading ? "Analyzing..." : "Explain + Improve"}
               </button>
+              {(quota?.coach_used ?? 0) >= (quota?.coach_limit ?? 3) && (
+                <div className="text-xs text-amber-300">
+                  Daily coach limit reached. Try again tomorrow.
+                </div>
+              )}
               {(coachLoading || coachError || coachResult) && (
                 <AgentPanel
                   title="Insights"
