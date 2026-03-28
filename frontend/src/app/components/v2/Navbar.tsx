@@ -25,6 +25,7 @@ const Navbar = () => {
           <>
             <a href="/upload" className="hover:text-brand-primary transition-colors">Upload Resume</a>
             <a href="/uploads" className="hover:text-brand-primary transition-colors">Dashboard</a>
+            <a href="/observability" className="hover:text-brand-primary transition-colors">API trace</a>
           </>
         ) : null}
       </div>
