@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, Request, HTTPException
+from fastapi import FastAPI, WebSocket, Request, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import json
@@ -15,6 +15,11 @@ from celery.result import AsyncResult
 from celery_app import celery_app
 from bson import ObjectId
 from utils.quota_service import can_consume_coach_call, consume_coach_call_success
+from utils.match_coach_cache import (
+    coach_key_from_job,
+    get_cached_match_coach,
+    save_match_coach_cache,
+)
 
 app = FastAPI()
 
@@ -139,8 +144,16 @@ async def match_coach(request: Request):
         if not user_email:
             raise HTTPException(status_code=404, detail="User not found for upload")
 
-        job_id = job.get("job_id") or job.get("jobId") or job.get("id") or ""
-        coach_key = str(job_id) if job_id else f"{job.get('title','')}|{job.get('company','')}"
+        coach_key = coach_key_from_job(job)
+
+        cached = get_cached_match_coach(upload_id, coach_key)
+        if cached:
+            return {
+                "upload_id": upload_id,
+                "why_good_match": cached["why_good_match"],
+                "improvements": cached["improvements"],
+                "cached": True,
+            }
 
         can_consume, meta = can_consume_coach_call(user_email, coach_key)
         if not can_consume:
@@ -152,16 +165,42 @@ async def match_coach(request: Request):
         service = MatchCoachService()
         result = service.explain_and_improve(job, user_resume)
 
+        save_match_coach_cache(
+            upload_id,
+            coach_key,
+            user_email,
+            result["why_good_match"],
+            result["improvements"],
+        )
         consume_coach_call_success(user_email, coach_key)
         return {
             "upload_id": upload_id,
             "why_good_match": result["why_good_match"],
             "improvements": result["improvements"],
+            "cached": False,
         }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/match-coach/cache")
+async def match_coach_cache_get(
+    upload_id: str = Query(...),
+    job_id: str = Query(...),
+):
+    if not upload_id.strip() or not job_id.strip():
+        raise HTTPException(status_code=400, detail="upload_id and job_id are required")
+    coach_key = str(job_id)
+    cached = get_cached_match_coach(upload_id, coach_key)
+    if not cached:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {
+        "why_good_match": cached["why_good_match"],
+        "improvements": cached["improvements"],
+        "cached": True,
+    }
 
 
 @app.websocket("/ws/chat")

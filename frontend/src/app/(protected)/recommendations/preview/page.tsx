@@ -174,6 +174,7 @@ export default function RecommendationsPreviewPage() {
   const [coachPanelOpen, setCoachPanelOpen] = useState(false);
   const [coachResult, setCoachResult] = useState<MatchCoachResult | null>(null);
   const [coachLoading, setCoachLoading] = useState(false);
+  const [coachPrefetching, setCoachPrefetching] = useState(false);
   const [coachError, setCoachError] = useState("");
   const coachCacheRef = useRef<Record<string, MatchCoachResult>>({});
 
@@ -204,6 +205,58 @@ export default function RecommendationsPreviewPage() {
     setCoachResult(null);
     setCoachError("");
   }, [selected, uploadId]);
+
+  useEffect(() => {
+    if (!selected || !uploadId || !workerBase || !coachPanelOpen) {
+      setCoachPrefetching(false);
+      return;
+    }
+    const key = `${uploadId}:${selected.id}`;
+    if (coachCacheRef.current[key]) {
+      setCoachResult(coachCacheRef.current[key]);
+      setCoachError("");
+      setCoachPrefetching(false);
+      return;
+    }
+    const ac = new AbortController();
+    setCoachPrefetching(true);
+    (async () => {
+      try {
+        const res = await fetch(
+          `${workerBase}/match-coach/cache?upload_id=${encodeURIComponent(uploadId)}&job_id=${encodeURIComponent(selected.id)}`,
+          { signal: ac.signal }
+        );
+        if (res.status === 404) {
+          if (!ac.signal.aborted) {
+            setCoachResult(null);
+            setCoachError("");
+          }
+          return;
+        }
+        if (!res.ok) return;
+        const data = await res.json();
+        const nextResult: MatchCoachResult = {
+          why_good_match: normalizeCoachBullets(data?.why_good_match),
+          improvements: normalizeCoachBullets(data?.improvements),
+        };
+        if (!nextResult.why_good_match.length || !nextResult.improvements.length) return;
+        coachCacheRef.current[key] = nextResult;
+        if (!ac.signal.aborted) {
+          setCoachResult(nextResult);
+          setCoachError("");
+        }
+      } catch {
+        if (!ac.signal.aborted) {
+          setCoachResult(null);
+        }
+      } finally {
+        if (!ac.signal.aborted) setCoachPrefetching(false);
+      }
+    })();
+    return () => {
+      ac.abort();
+    };
+  }, [selected?.id, uploadId, workerBase, coachPanelOpen]);
 
   const totalPages = Math.max(
     1,
@@ -418,7 +471,9 @@ export default function RecommendationsPreviewPage() {
       }
       coachCacheRef.current[key] = nextResult;
       setCoachResult(nextResult);
-      refetchQuota();
+      if (!data?.cached) {
+        refetchQuota();
+      }
     } catch (err: any) {
       setCoachError(err.message || "Failed to load match coach response");
     } finally {
@@ -723,8 +778,9 @@ export default function RecommendationsPreviewPage() {
                 </div>
               </div>
               <p className="text-brand-muted text-sm leading-relaxed">
-                Use match coach to understand why this role fits your profile and what to change
-                in your resume or cover letter before you apply.
+                {coachResult
+                  ? "Saved insight for this role and your resume."
+                  : "Use match coach to understand why this role fits your profile and what to change in your resume or cover letter before you apply."}
               </p>
               <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3">
                 <div className="flex items-center justify-between text-xs">
@@ -734,14 +790,21 @@ export default function RecommendationsPreviewPage() {
                   </span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={handleExplainAndImprove}
-                disabled={coachLoading || ((quota?.coach_used ?? 0) >= (quota?.coach_limit ?? 3))}
-                className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold border border-white/10 bg-brand-primary-soft text-brand-primary hover:bg-brand-primary hover:text-brand-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {coachLoading ? "Analyzing..." : "Explain + Improve"}
-              </button>
+              {coachPrefetching && !coachResult && (
+                <div className="text-xs text-brand-muted">Loading saved insight…</div>
+              )}
+              {!coachResult && !coachPrefetching && (
+                <button
+                  type="button"
+                  onClick={handleExplainAndImprove}
+                  disabled={
+                    coachLoading || (quota?.coach_used ?? 0) >= (quota?.coach_limit ?? 3)
+                  }
+                  className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold border border-white/10 bg-brand-primary-soft text-brand-primary hover:bg-brand-primary hover:text-brand-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {coachLoading ? "Analyzing..." : "Explain + Improve"}
+                </button>
+              )}
               {(quota?.coach_used ?? 0) >= (quota?.coach_limit ?? 3) && (
                 <div className="text-xs text-amber-300">
                   Daily coach limit reached. Try again tomorrow.
