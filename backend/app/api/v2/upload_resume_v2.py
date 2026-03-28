@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 
@@ -27,6 +29,29 @@ async def upload_resume_v2(
         logger.warning("Rejected non-PDF upload for user=%s, filename=%s", user_email, file.filename)
         raise HTTPException(status_code=400, detail="Only PDF files are supported in v2.")
 
+    raw = await file.read()
+    file_content_hash = hashlib.sha256(raw).hexdigest()
+    await file.seek(0)
+
+    reusable_id = await resume_upload_service.find_reusable_completed_upload_id(
+        user_email=user_email,
+        file_content_hash=file_content_hash,
+    )
+    if reusable_id:
+        logger.info(
+            "Returning existing upload for duplicate file user=%s upload_id=%s",
+            user_email,
+            reusable_id,
+        )
+        return JSONResponse(
+            content=UploadResumeResponse(
+                upload_id=reusable_id,
+                parse_task_id="",
+                status="completed",
+                message="This file was already processed today. Using your existing recommendations.",
+            ).model_dump()
+        )
+
     quota = await quota_service.get_quota_status(user_email=user_email)
     if quota.get("uploads_used", 0) >= quota.get("uploads_limit", 3):
         date_key = quota.get("date_key")
@@ -50,14 +75,14 @@ async def upload_resume_v2(
     file_id = await storage.save_file(file, user_email=user_email)
     logger.info("Saved file to GridFS: file_id=%s for user=%s", file_id, user_email)
 
-    # UploadFile may not always have size; default to 0 if missing
-    file_size = getattr(file, "size", 0) or 0
+    file_size = len(raw)
 
     upload_id = await resume_upload_service.create_upload(
         user_email=user_email,
         file_name=file.filename or "resume.pdf",
         file_size=int(file_size),
         file_path=file_id,
+        file_content_hash=file_content_hash,
     )
     logger.info("Created ResumeUpload record: upload_id=%s", upload_id)
 

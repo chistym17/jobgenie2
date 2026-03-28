@@ -14,7 +14,7 @@ import { useNotifications } from "../../hooks/useNotifications";
 import { useResumeUploadV2 } from "../../hooks/useResumeUploadV2";
 import { useRecommendationHistory } from "../../hooks/useRecommendationHistory";
 import { useQuotaStatus } from "../../hooks/useQuotaStatus";
-import ToastContainer from "../../components/v2/ToastContainer";
+import ToastContainer, { type ToastData } from "../../components/v2/ToastContainer";
 import NotificationItem from "../../components/v2/NotificationItem";
 import {
   UploadHistorySkeleton,
@@ -80,11 +80,15 @@ interface NewUploadTabProps {
   setUploading: (uploading: boolean) => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   userEmail: string | null;
-  uploadResume: (file: File, userEmail: string) => Promise<{ upload_id: string }>;
+  uploadResume: (
+    file: File,
+    userEmail: string
+  ) => Promise<{ upload_id: string; parse_task_id: string; status: string; message: string }>;
   isUploading: boolean;
   router: ReturnType<typeof useRouter>;
   setActiveTab: (tab: "history" | "new" | "recommendations" | "notifications") => void;
   refetchHistory: () => void;
+  onDuplicateFileReuse: (message: string) => void;
 }
 
 function NewUploadTab({
@@ -99,6 +103,7 @@ function NewUploadTab({
   router,
   setActiveTab,
   refetchHistory,
+  onDuplicateFileReuse,
 }: NewUploadTabProps) {
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -139,7 +144,9 @@ function NewUploadTab({
       const data = await uploadResume(file, userEmail);
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      // Switch to history tab and refresh
+      if (data.status === "completed" && !data.parse_task_id) {
+        onDuplicateFileReuse(data.message || "This file was already processed.");
+      }
       setActiveTab("history");
       refetchHistory();
       router.push(`/uploads?upload_id=${data.upload_id}`);
@@ -408,6 +415,18 @@ export default function ResumeUploadsDashboard() {
   const [deleteConfirmUploadId, setDeleteConfirmUploadId] = useState<string | null>(null);
   const [deleteConfirmRecommendationId, setDeleteConfirmRecommendationId] = useState<string | null>(null);
   const { notifications, toasts, removeToast } = useNotifications(focusedUploadId, focusedStatus, focusedErrorMessage);
+  const [extraToasts, setExtraToasts] = useState<ToastData[]>([]);
+  const mergedToasts = useMemo(() => [...toasts, ...extraToasts], [toasts, extraToasts]);
+  const handleToastClose = (id: string) => {
+    removeToast(id);
+    setExtraToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+  const handleDuplicateFileReuse = (message: string) => {
+    setExtraToasts((prev) => [
+      ...prev,
+      { id: `dup-${crypto.randomUUID()}`, message, type: "info" },
+    ]);
+  };
 
   const redirectInFlightRef = useRef(false);
   useEffect(() => {
@@ -784,6 +803,7 @@ export default function ResumeUploadsDashboard() {
                   router={router}
                   setActiveTab={setActiveTab}
                   refetchHistory={refetchHistory}
+                  onDuplicateFileReuse={handleDuplicateFileReuse}
                 />
               )}
 
@@ -905,7 +925,7 @@ export default function ResumeUploadsDashboard() {
         </main>
       </div>
 
-      <ToastContainer toasts={toasts} onClose={removeToast} />
+      <ToastContainer toasts={mergedToasts} onClose={handleToastClose} />
 
       <ConfirmationModal
         isOpen={!!deleteConfirmUploadId}

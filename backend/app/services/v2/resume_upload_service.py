@@ -9,7 +9,10 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
 from app.models.v2.upload_db_models import (
     RESUME_UPLOADS_COLLECTION,
     ResumeUpload,
+    UploadStatus,
 )
+from app.models.v2.recommendation_db_models import RECOMMENDATIONS_COLLECTION
+from app.services.v2.quota_service import utc_date_key
 from app.utils.logger_v2 import get_v2_logger
 
 
@@ -23,7 +26,69 @@ def _get_mongo_client() -> AsyncIOMotorClient:
 _client: AsyncIOMotorClient = _get_mongo_client()
 _db = _client.jobs_db
 _collection: AsyncIOMotorCollection = _db[RESUME_UPLOADS_COLLECTION]
+_recommendations_collection: AsyncIOMotorCollection = _db[RECOMMENDATIONS_COLLECTION]
 _logger = get_v2_logger("resume_v2.service.uploads")
+_upload_dedupe_index_ensured = False
+
+
+async def ensure_upload_dedupe_index() -> None:
+    global _upload_dedupe_index_ensured
+    if _upload_dedupe_index_ensured:
+        return
+    await _collection.create_index(
+        [("user_email", 1), ("file_content_hash", 1)],
+        name="user_email_file_content_hash",
+    )
+    _upload_dedupe_index_ensured = True
+
+
+async def find_reusable_completed_upload_id(
+    user_email: str,
+    file_content_hash: str,
+) -> Optional[str]:
+    if not file_content_hash:
+        return None
+    await ensure_upload_dedupe_index()
+    today_key = utc_date_key()
+    cursor = (
+        _collection.find(
+            {
+                "user_email": user_email,
+                "file_content_hash": file_content_hash,
+                "status": UploadStatus.COMPLETED,
+            }
+        )
+        .sort("created_at", -1)
+        .limit(8)
+    )
+    async for doc in cursor:
+        uid = str(doc["_id"])
+        rec = await _recommendations_collection.find_one({"upload_id": ObjectId(uid)})
+        if not rec:
+            continue
+        ref = doc.get("completed_at")
+        if ref is None:
+            ref = rec.get("created_at")
+        if ref is None:
+            ref = doc.get("created_at")
+        if not isinstance(ref, datetime):
+            continue
+        if utc_date_key(ref) != today_key:
+            _logger.info(
+                "Dedupe skip not_same_utc_day user=%s hash_prefix=%s upload_id=%s",
+                user_email,
+                file_content_hash[:12],
+                uid,
+            )
+            continue
+        _logger.info(
+            "Dedupe hit user=%s hash_prefix=%s upload_id=%s",
+            user_email,
+            file_content_hash[:12],
+            uid,
+        )
+        return uid
+    return None
 
 
 async def create_upload(
@@ -31,12 +96,14 @@ async def create_upload(
     file_name: str,
     file_size: int,
     file_path: str,
+    file_content_hash: Optional[str] = None,
 ) -> str:
     upload = ResumeUpload(
         user_email=user_email,
         file_name=file_name,
         file_size=file_size,
         file_path=file_path,
+        file_content_hash=file_content_hash,
     )
     doc = upload.model_dump(by_alias=True, exclude_none=True)
     if "_id" in doc:
