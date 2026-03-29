@@ -1,11 +1,29 @@
-from db import fetch_resume_data
-from utils.qdrant_service import search_similar, get_resume_embedding_by_email
-from utils.embedder import get_embedding
 import numpy as np
 import re
+from db import fetch_resume_data
+from utils.embedder import get_embedding
 from utils.qdrant_service import insert_resume_embedding
+from utils.qdrant_service import search_similar, get_resume_embedding_by_email
 from utils.hybrid_query import build_sparse_query
 from utils.sparse_index import ensure_sparse_job_index, search_sparse_candidates
+
+
+def _rrf_rank(
+    dense_ids: list[str],
+    sparse_ids: list[str],
+    k: int = 60,
+) -> dict[str, float]:
+    scores: dict[str, float] = {}
+    for rank, jid in enumerate(dense_ids, start=1):
+        if not jid:
+            continue
+        scores[jid] = scores.get(jid, 0.0) + 1.0 / (k + rank)
+    for rank, jid in enumerate(sparse_ids, start=1):
+        if not jid:
+            continue
+        scores[jid] = scores.get(jid, 0.0) + 1.0 / (k + rank)
+    return scores
+
 
 def chunk_text(text, max_length=500):
     sentences = re.split(r'(?<=[.!?]) +', text)
@@ -140,6 +158,46 @@ def fetch_recommendations(user_email: str):
     print(
         "[HYBRID][MERGE] dense=%s sparse=%s overlap=%s union=%s"
         % (len(dense_set), len(sparse_set), overlap, union_count)
+    )
+    dense_by_id = {j["job_id"]: j for j in job_data_with_ids if j.get("job_id")}
+    sparse_by_id: dict[str, dict] = {}
+    for c in sparse_candidates:
+        jid = c.get("job_id")
+        if not jid or jid in dense_by_id or jid in sparse_by_id:
+            continue
+        txt = str(c.get("text") or "").strip()
+        if not txt:
+            continue
+        summary = re.sub(r"\s+", " ", txt).strip()
+        if len(summary) > 1200:
+            summary = summary[:1199] + "…"
+        sparse_by_id[jid] = {
+            "job_id": jid,
+            "summary": summary,
+            "title": "",
+            "url": "",
+            "company": "",
+            "location": "",
+            "date": "",
+        }
+    sparse_added = len(sparse_by_id)
+    rrf_scores = _rrf_rank(dense_ids, sparse_ids_all, k=60)
+    merged_ids = list(dense_by_id.keys()) + list(sparse_by_id.keys())
+    ranked_ids = sorted(
+        merged_ids,
+        key=lambda jid: (rrf_scores.get(jid, 0.0),),
+        reverse=True,
+    )
+    merged_ranked = [dense_by_id.get(jid) or sparse_by_id.get(jid) for jid in ranked_ids]
+    job_data_with_ids = [x for x in merged_ranked if x]
+    print(
+        "[HYBRID][UNION] dense_kept=%s sparse_added=%s final=%s rrf_top=%s"
+        % (
+            len(dense_ids),
+            sparse_added,
+            len(job_data_with_ids),
+            ",".join(ranked_ids[:5]),
+        )
     )
     
     return job_data_with_ids
