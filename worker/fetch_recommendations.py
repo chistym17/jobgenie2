@@ -4,6 +4,7 @@ from utils.embedder import get_embedding
 import numpy as np
 import re
 from utils.qdrant_service import insert_resume_embedding
+from utils.hybrid_query import build_sparse_query
 
 def chunk_text(text, max_length=500):
     sentences = re.split(r'(?<=[.!?]) +', text)
@@ -38,15 +39,17 @@ def extract_relevant_resume_text(resume):
     return '\n'.join(parts)
 
 def fetch_recommendations(user_email: str):
-    
+    resume = fetch_resume_data(user_email)
+    if not resume:
+        print("No resume data found")
+        return []
+    sparse_query = build_sparse_query(resume)
+    if sparse_query:
+        print(f"[HYBRID][QUERY] user={user_email} query='{sparse_query[:180]}'")
+
     embedding = get_resume_embedding_by_email(user_email)
     
     if embedding is None:
-        resume = fetch_resume_data(user_email)
-        if not resume:
-            print("No resume data found")
-            return []
-        
         relevant_text = extract_relevant_resume_text(resume)
         chunks = chunk_text(relevant_text, max_length=500)
         embeddings = []
