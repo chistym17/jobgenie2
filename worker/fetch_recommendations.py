@@ -5,7 +5,7 @@ import numpy as np
 import re
 from utils.qdrant_service import insert_resume_embedding
 from utils.hybrid_query import build_sparse_query
-from utils.sparse_index import ensure_sparse_job_index
+from utils.sparse_index import ensure_sparse_job_index, search_sparse_candidates
 
 def chunk_text(text, max_length=500):
     sentences = re.split(r'(?<=[.!?]) +', text)
@@ -57,6 +57,17 @@ def fetch_recommendations(user_email: str):
     sparse_query = build_sparse_query(resume)
     if sparse_query:
         print(f"[HYBRID][QUERY] user={user_email} query='{sparse_query[:180]}'")
+        sparse_candidates = search_sparse_candidates(sparse_query, top_k=40)
+        sparse_ids = [c.get("job_id") for c in sparse_candidates[:5] if c.get("job_id")]
+        print(
+            "[HYBRID][SPARSE] query_terms=%s top_k=%s hit_count=%s top_ids=%s"
+            % (
+                len(sparse_query.split()),
+                40,
+                len(sparse_candidates),
+                ",".join(sparse_ids),
+            )
+        )
 
     embedding = get_resume_embedding_by_email(user_email)
     

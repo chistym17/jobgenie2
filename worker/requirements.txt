@@ -22,3 +22,4 @@ celery
 redis
 google-genai
 PyPDF2
+rank-bm25
