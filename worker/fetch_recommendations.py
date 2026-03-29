@@ -54,6 +54,7 @@ def fetch_recommendations(user_email: str):
     if not resume:
         print("No resume data found")
         return []
+    sparse_candidates = []
     sparse_query = build_sparse_query(resume)
     if sparse_query:
         print(f"[HYBRID][QUERY] user={user_email} query='{sparse_query[:180]}'")
@@ -130,6 +131,16 @@ def fetch_recommendations(user_email: str):
                 'location': location,
                 'date': payload.get('date', '')
             })
+    dense_ids = [j.get("job_id") for j in job_data_with_ids if j.get("job_id")]
+    sparse_ids_all = [c.get("job_id") for c in sparse_candidates if c.get("job_id")]
+    dense_set = set(dense_ids)
+    sparse_set = set(sparse_ids_all)
+    overlap = len(dense_set & sparse_set)
+    union_count = len(dense_set | sparse_set)
+    print(
+        "[HYBRID][MERGE] dense=%s sparse=%s overlap=%s union=%s"
+        % (len(dense_set), len(sparse_set), overlap, union_count)
+    )
     
     return job_data_with_ids
 
