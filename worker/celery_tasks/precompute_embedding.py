@@ -3,7 +3,6 @@ from db import fetch_resume_data
 from utils.local_embedder import get_embedding
 from utils.qdrant_service import insert_resume_embedding
 from fetch_recommendations import extract_relevant_resume_text, chunk_text
-from celery_tasks.recommendation_task import generate_recommendations_task
 from utils.upload_status import update_upload_status, add_activity_event
 from utils.logger_v2 import get_v2_logger
 from utils.funcs import sanitize_error_message
@@ -65,16 +64,13 @@ def precompute_resume_embedding_task(user_email: str, upload_id: str | None = No
         if upload_id:
             update_upload_status(upload_id, "embedding_completed")
             add_activity_event(upload_id, "Embeddings Ready", "Resume embeddings created successfully", "completed")
-            logger.info("Embedding completed for upload_id=%s user_email=%s", upload_id, user_email)
-            rec_task = generate_recommendations_task.delay(user_email, upload_id)
-            update_upload_status(upload_id, "recommendations", recommendation_task_id=rec_task.id)
-            add_activity_event(upload_id, "Generating Recommendations", "Finding the best job matches for your profile", "in_progress")
-            logger.info(
-                "Triggered generate_recommendations_task for upload_id=%s task_id=%s user_email=%s",
+            add_activity_event(
                 upload_id,
-                rec_task.id,
-                user_email,
+                "Resume Ready",
+                "Your resume is ready. Create recommendations when you want job matches.",
+                "completed",
             )
+            logger.info("Embedding completed for upload_id=%s user_email=%s", upload_id, user_email)
 
         return {"status": "success", "email": user_email}
 

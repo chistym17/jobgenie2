@@ -11,8 +11,9 @@ from app.models.v2.upload_models import (
     UploadStatusProgress,
     UploadHistoryResponse,
     UploadListItem,
+    StartRecommendationsResponse,
 )
-from app.services.v2 import resume_upload_service, quota_service
+from app.services.v2 import resume_upload_service, quota_service, recommendation_service
 from app.utils.logger_v2 import get_v2_logger
 
 
@@ -71,6 +72,99 @@ async def get_upload_status(upload_id: str):
         created_at=doc.get("created_at"),
         updated_at=doc.get("updated_at"),
         completed_at=doc.get("completed_at"),
+    )
+
+
+@router.post("/upload/{upload_id}/recommendations", response_model=StartRecommendationsResponse)
+async def start_recommendations(
+    upload_id: str,
+    user_email: str = Query(..., description="User email (must own the upload)"),
+):
+    doc = await resume_upload_service.get_upload(upload_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    if doc.get("user_email") != user_email:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    st = doc.get("status", "")
+    if st == UploadStatus.COMPLETED:
+        return StartRecommendationsResponse(
+            upload_id=upload_id,
+            status="completed",
+            task_id=None,
+            message="Recommendations already exist for this upload.",
+        )
+    if st == UploadStatus.RECOMMENDATIONS:
+        return StartRecommendationsResponse(
+            upload_id=upload_id,
+            status="recommendations",
+            task_id=str(doc.get("recommendation_task_id") or "") or None,
+            message="Recommendation generation already in progress.",
+        )
+
+    if st not in (UploadStatus.EMBEDDING_COMPLETED, UploadStatus.FAILED):
+        raise HTTPException(
+            status_code=400,
+            detail="Recommendations can only be started after embeddings are ready.",
+        )
+    if st == UploadStatus.FAILED and not doc.get("resume_id"):
+        raise HTTPException(
+            status_code=400,
+            detail="Upload cannot create recommendations in its current state.",
+        )
+
+    allowed, _meta = await quota_service.can_consume_upload_completion(user_email, upload_id)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Daily recommendation quota exceeded. Try again tomorrow.",
+        )
+
+    async_result = celery_client.send_task(
+        "generate_recommendations",
+        args=[user_email, upload_id],
+    )
+    claimed = await resume_upload_service.claim_recommendations_start(
+        upload_id, user_email, async_result.id
+    )
+    if not claimed:
+        async_result.revoke(terminate=True)
+        doc2 = await resume_upload_service.get_upload(upload_id)
+        if doc2 and doc2.get("status") == UploadStatus.COMPLETED:
+            return StartRecommendationsResponse(
+                upload_id=upload_id,
+                status="completed",
+                task_id=None,
+                message="Recommendations already exist for this upload.",
+            )
+        if doc2 and doc2.get("status") == UploadStatus.RECOMMENDATIONS:
+            return StartRecommendationsResponse(
+                upload_id=upload_id,
+                status="recommendations",
+                task_id=str(doc2.get("recommendation_task_id") or "") or None,
+                message="Recommendation generation already in progress.",
+            )
+        raise HTTPException(status_code=409, detail="Could not start recommendations. Try again.")
+
+    await resume_upload_service.add_activity_event(
+        upload_id,
+        "Starting Recommendations",
+        "Starting recommendations...",
+        "in_progress",
+    )
+
+    logger.info(
+        "Started recommendations upload_id=%s user_email=%s task_id=%s",
+        upload_id,
+        user_email,
+        async_result.id,
+    )
+
+    return StartRecommendationsResponse(
+        upload_id=upload_id,
+        status="recommendations",
+        task_id=async_result.id,
+        message="Recommendation generation started.",
     )
 
 
@@ -181,6 +275,16 @@ async def delete_upload(upload_id: str):
     doc = await resume_upload_service.get_upload(upload_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Upload not found")
+
+    user_email = doc.get("user_email")
+    await recommendation_service.delete_recommendations_for_upload(upload_id)
+    await resume_upload_service.delete_match_coach_cache_for_upload(upload_id)
+    if user_email:
+        await quota_service.release_upload_quota_slot(user_email, upload_id)
+
+    resume_id = doc.get("resume_id")
+    if resume_id:
+        await resume_upload_service.delete_resume_for_upload(resume_id)
 
     file_id = doc.get("file_path")
     if file_id:

@@ -18,7 +18,7 @@ const STATUS_STEPS: Record<string, { step: string; message: string }> = {
   parsing: { step: 'Parsing Started', message: 'Analyzing your resume content and extracting information' },
   parsed: { step: 'Parsing Completed', message: 'Resume successfully parsed and structured' },
   embedding: { step: 'Creating Embeddings', message: 'Generating vector embeddings for semantic search' },
-  embedding_completed: { step: 'Embeddings Ready', message: 'Resume embeddings created successfully' },
+  embedding_completed: { step: 'Embeddings Ready', message: 'Resume ready — create recommendations when you want job matches.' },
   recommendations: { step: 'Generating Recommendations', message: 'Finding the best job matches for your profile' },
   completed: { step: 'Recommendations Ready', message: 'Your personalized job recommendations are ready!' },
   failed: { step: 'Processing Failed', message: 'An error occurred during processing' },
@@ -31,9 +31,9 @@ const STATUS_TO_TOAST: Record<string, { message: string; type: 'success' | 'info
   parsing: { message: 'Parsing your resume...', type: 'info' },
   parsed: { message: 'Resume parsed successfully', type: 'success' },
   embedding: { message: 'Creating embeddings...', type: 'info' },
-  embedding_completed: { message: 'Embeddings ready', type: 'success' },
-  recommendations: { message: 'Finding job matches...', type: 'info' },
-  completed: { message: 'Recommendations ready!', type: 'success' },
+  embedding_completed: { message: 'Resume ready — you can create recommendations when you want.', type: 'success' },
+  recommendations: { message: '', type: 'info' },
+  completed: { message: '', type: 'success' },
   failed: { message: 'Processing failed', type: 'error' },
   parsing_failed: { message: 'Parsing failed', type: 'error' },
   embedding_failed: { message: 'Embedding failed', type: 'error' },
@@ -208,7 +208,7 @@ export function useNotifications(uploadId: string | null, currentStatus: string 
       });
 
       const toastInfo = STATUS_TO_TOAST[currentStatus];
-      if (toastInfo && prevStatusRef.current !== null) {
+      if (toastInfo && toastInfo.message && prevStatusRef.current !== null) {
         const toastId = `toast-${Date.now()}`;
         setToasts([{ id: toastId, message: toastInfo.message, type: toastInfo.type }]);
       }

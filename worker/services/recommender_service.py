@@ -11,6 +11,24 @@ except ImportError:
     HAS_JSON_REPAIR = False
 
 class RecommenderService:
+    REQUIRED_FIELDS = [
+        "Job ID",
+        "Job Title",
+        "Company Name",
+        "Location",
+        "Job Type",
+        "Salary",
+        "Posted Date",
+        "Application Deadline",
+        "Key Requirements",
+        "Bonus Skills",
+        "Stack",
+        "Description",
+        "How to Apply",
+        "Direct Link",
+        "Match Score",
+    ]
+
     def _extract_json_from_response(self, response_text: str) -> str:
         response_text = response_text.strip()
         
@@ -63,6 +81,74 @@ class RecommenderService:
             
             raise ValueError(f"Failed to parse JSON: {e.msg} at position {e.pos}")
 
+    def _apply_deterministic_match_scores(self, recommendations: list, candidates: list) -> list:
+        if not isinstance(recommendations, list):
+            return recommendations
+        rank_map: dict[str, int] = {}
+        rrf_map: dict[str, float] = {}
+        for idx, c in enumerate(candidates, start=1):
+            jid = str(c.get("job_id") or "").strip()
+            if not jid:
+                continue
+            rank_map[jid] = idx
+            rrf_map[jid] = float(c.get("rrf_score") or 0.0)
+        if not rank_map:
+            return recommendations
+        vals = [v for v in rrf_map.values() if v > 0]
+        min_rrf = min(vals) if vals else 0.0
+        max_rrf = max(vals) if vals else 0.0
+        span = (max_rrf - min_rrf) if max_rrf > min_rrf else 0.0
+        updated: list = []
+        for item in recommendations:
+            if not isinstance(item, dict):
+                updated.append(item)
+                continue
+            jid = str(item.get("Job ID") or item.get("job_id") or "").strip()
+            if jid and jid in rank_map:
+                rrf = rrf_map.get(jid, 0.0)
+                if span > 0:
+                    norm = (rrf - min_rrf) / span
+                    score = int(round(55 + (norm * 40)))
+                else:
+                    rank = rank_map[jid]
+                    score = max(45, 98 - ((rank - 1) * 6))
+            else:
+                score = 45
+            score = max(0, min(100, int(score)))
+            item["Match Score"] = score
+            updated.append(item)
+        return updated
+
+    def _filter_incomplete_recommendations(self, recommendations: list, candidates: list) -> list:
+        if not isinstance(recommendations, list):
+            return []
+        allowed_ids = {
+            str(c.get("job_id") or "").strip()
+            for c in candidates
+            if str(c.get("job_id") or "").strip()
+        }
+        filtered: list = []
+        dropped = 0
+        for item in recommendations:
+            if not isinstance(item, dict):
+                dropped += 1
+                continue
+            jid = str(item.get("Job ID") or item.get("job_id") or "").strip()
+            if not jid:
+                dropped += 1
+                continue
+            if allowed_ids and jid not in allowed_ids:
+                dropped += 1
+                continue
+            missing = [k for k in self.REQUIRED_FIELDS if k not in item]
+            if missing:
+                dropped += 1
+                continue
+            filtered.append(item)
+        if dropped:
+            print(f"[RECOMMENDER_SERVICE] Dropped {dropped} incomplete recommendation item(s)")
+        return filtered
+
     def generate_recommendations(self, user_email: str) -> list:
         job_data_list = fetch_recommendations(user_email)
         
@@ -93,7 +179,15 @@ class RecommenderService:
             
             if not isinstance(recommendations, list):
                 recommendations = [recommendations]
-            
+
+            recommendations = self._apply_deterministic_match_scores(
+                recommendations[:5],
+                job_data_list[:max_jobs],
+            )
+            recommendations = self._filter_incomplete_recommendations(
+                recommendations,
+                job_data_list[:max_jobs],
+            )
             return recommendations[:5]
             
         except Exception as e:
