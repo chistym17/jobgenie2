@@ -81,16 +81,6 @@ export function useActivityTimeline(uploadId: string | null) {
         if (cancelled) return;
         
         const newActivities = data.activity_timeline || [];
-        const steps = Array.isArray(newActivities)
-          ? newActivities.map((a: ActivityEvent) => `${a.step}:${a.status}`)
-          : [];
-        console.log("[rec-progress][poll]", {
-          uploadId,
-          isInitial,
-          count: newActivities.length,
-          steps,
-        });
-        
         // Check if we should stop polling
         const shouldStop = shouldStopPollingCheck(newActivities);
         if (shouldStop) {
@@ -99,7 +89,6 @@ export function useActivityTimeline(uploadId: string | null) {
             clearInterval(intervalId);
             intervalId = null;
           }
-          console.log("[rec-progress][stop]", { uploadId, reason: "terminal_activity" });
         }
         
         // Only update if activities have actually changed
@@ -132,11 +121,6 @@ export function useActivityTimeline(uploadId: string | null) {
       } catch (err: any) {
         if (cancelled) return;
         setError(err.message || "Unknown error");
-        console.log("[rec-progress][error]", {
-          uploadId,
-          isInitial,
-          message: err?.message || "Unknown error",
-        });
         if (isInitial) {
           setIsInitialLoad(false);
         }

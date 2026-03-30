@@ -544,7 +544,10 @@ export default function ResumeUploadsDashboard() {
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to start recommendations";
-      setExtraToasts((prev) => [...prev, { id: `rec-err-${crypto.randomUUID()}`, message: msg, type: "error" }]);
+      setExtraToasts((prev) => [
+        ...prev,
+        { id: `rec-err-${crypto.randomUUID()}`, message: msg, type: "error", durationMs: 4000 },
+      ]);
     } finally {
       setStartingRecFor(null);
     }
@@ -554,11 +557,6 @@ export default function ResumeUploadsDashboard() {
     if (focusedStatus === "recommendations") {
       setShowRecProgressModal(true);
     }
-    console.log("[rec-progress][status]", {
-      focusedUploadId,
-      focusedStatus,
-      activitiesCount: focusedActivities.length,
-    });
   }, [focusedStatus]);
 
   useEffect(() => {
@@ -567,34 +565,14 @@ export default function ResumeUploadsDashboard() {
       return;
     }
     if (!progressState.stageKey || progressState.stageKey === "none") {
-      console.log("[rec-progress][toast-skip]", {
-        focusedUploadId,
-        focusedStatus,
-        reason: "no_stage",
-        progressState,
-      });
       return;
     }
     if (Date.now() < recStageToastCooldownUntilRef.current) return;
     const toastKey = `${focusedUploadId}:${progressState.stageKey}`;
     if (lastProgressToastRef.current === toastKey) {
-      console.log("[rec-progress][toast-skip]", {
-        focusedUploadId,
-        focusedStatus,
-        reason: "same_stage",
-        toastKey,
-      });
       return;
     }
     lastProgressToastRef.current = toastKey;
-    console.log("[rec-progress][toast-stage]", {
-      focusedUploadId,
-      focusedStatus,
-      stage: progressState.stageKey,
-      percent: progressState.percent,
-      message: progressState.message,
-      steps: focusedActivities.map((a) => `${a.step}:${a.status}`),
-    });
     if (progressState.stageKey === "done") {
       setExtraToasts((prev) => [
         ...prev,
