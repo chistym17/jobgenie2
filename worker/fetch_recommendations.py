@@ -1,6 +1,8 @@
 import numpy as np
+import os
 import re
 from db import fetch_resume_data
+from db import fetch_single_job_details
 from utils.embedder import get_embedding
 from utils.qdrant_service import insert_resume_embedding
 from utils.qdrant_service import search_similar, get_resume_embedding_by_email
@@ -56,6 +58,71 @@ def extract_relevant_resume_text(resume):
         parts.append('Education: ' + edu_str)
  
     return '\n'.join(parts)
+
+
+def _normalize_sparse_candidate(jid: str, fallback_text: str) -> dict:
+    job = fetch_single_job_details(jid) or {}
+    title = str(job.get("title") or "")
+    company = str(job.get("company") or "")
+    location = str(job.get("location") or "")
+    url = str(job.get("url") or "")
+    date = str(job.get("date") or "")
+    description = str(job.get("description") or "")
+    requirements = job.get("requirements") or job.get("requirement") or []
+    if isinstance(requirements, list):
+        req_text = "; ".join([str(x) for x in requirements[:8] if x])
+    else:
+        req_text = str(requirements)
+    summary = " ".join([title, company, location, req_text, description]).strip()
+    if not summary:
+        summary = str(fallback_text or "").strip()
+    summary = re.sub(r"\s+", " ", summary).strip()
+    if len(summary) > 1200:
+        summary = summary[:1199] + "…"
+    return {
+        "job_id": jid,
+        "summary": summary,
+        "title": title,
+        "url": url,
+        "company": company,
+        "location": location,
+        "date": date,
+    }
+
+
+def _resume_skill_terms(resume: dict, max_terms: int = 40) -> set[str]:
+    raw = resume.get("skills") or []
+    terms: set[str] = set()
+    for item in raw:
+        txt = str(item or "").strip().lower()
+        if not txt:
+            continue
+        for tok in re.findall(r"[a-z0-9.+#-]+", txt):
+            if len(tok) < 2:
+                continue
+            terms.add(tok)
+            if len(terms) >= max_terms:
+                return terms
+    return terms
+
+
+def _skill_overlap_count(skill_terms: set[str], candidate: dict) -> int:
+    if not skill_terms:
+        return 0
+    corpus = " ".join(
+        [
+            str(candidate.get("title") or ""),
+            str(candidate.get("summary") or ""),
+            str(candidate.get("company") or ""),
+        ]
+    ).lower()
+    toks = set(re.findall(r"[a-z0-9.+#-]+", corpus))
+    return len(skill_terms & toks)
+
+
+def _hybrid_sort_score(rrf: float, overlap_count: int) -> float:
+    boost = min(0.0012, max(0, overlap_count) * 0.0001)
+    return float(rrf) + boost
 
 def fetch_recommendations(user_email: str):
     sparse_meta = ensure_sparse_job_index()
@@ -168,34 +235,61 @@ def fetch_recommendations(user_email: str):
         txt = str(c.get("text") or "").strip()
         if not txt:
             continue
-        summary = re.sub(r"\s+", " ", txt).strip()
-        if len(summary) > 1200:
-            summary = summary[:1199] + "…"
-        sparse_by_id[jid] = {
-            "job_id": jid,
-            "summary": summary,
-            "title": "",
-            "url": "",
-            "company": "",
-            "location": "",
-            "date": "",
-        }
+        sparse_by_id[jid] = _normalize_sparse_candidate(jid, txt)
     sparse_added = len(sparse_by_id)
+    skill_terms = _resume_skill_terms(resume)
+    for c in dense_by_id.values():
+        c["skill_overlap_count"] = _skill_overlap_count(skill_terms, c)
+    for c in sparse_by_id.values():
+        c["skill_overlap_count"] = _skill_overlap_count(skill_terms, c)
     rrf_scores = _rrf_rank(dense_ids, sparse_ids_all, k=60)
     merged_ids = list(dense_by_id.keys()) + list(sparse_by_id.keys())
     ranked_ids = sorted(
         merged_ids,
-        key=lambda jid: (rrf_scores.get(jid, 0.0),),
+        key=lambda jid: (
+            _hybrid_sort_score(
+                rrf_scores.get(jid, 0.0),
+                int((dense_by_id.get(jid) or sparse_by_id.get(jid) or {}).get("skill_overlap_count") or 0),
+            ),
+        ),
         reverse=True,
     )
-    merged_ranked = [dense_by_id.get(jid) or sparse_by_id.get(jid) for jid in ranked_ids]
+    merged_ranked = []
+    for jid in ranked_ids:
+        item = dense_by_id.get(jid) or sparse_by_id.get(jid)
+        if not item:
+            continue
+        item["rrf_score"] = float(rrf_scores.get(jid, 0.0))
+        item["hybrid_sort_score"] = _hybrid_sort_score(
+            item["rrf_score"],
+            int(item.get("skill_overlap_count") or 0),
+        )
+        merged_ranked.append(item)
     job_data_with_ids = [x for x in merged_ranked if x]
+    try:
+        candidate_cap = int(os.getenv("HYBRID_CANDIDATE_CAP", "50"))
+    except Exception:
+        candidate_cap = 50
+    candidate_cap = max(10, min(200, candidate_cap))
+    pre_cap_count = len(job_data_with_ids)
+    if pre_cap_count > candidate_cap:
+        job_data_with_ids = job_data_with_ids[:candidate_cap]
+    overlaps: list[int] = []
+    for c in job_data_with_ids:
+        n = int(c.get("skill_overlap_count") or 0)
+        overlaps.append(n)
+    overlap_avg = (sum(overlaps) / len(overlaps)) if overlaps else 0.0
+    overlap_max = max(overlaps) if overlaps else 0
     print(
-        "[HYBRID][UNION] dense_kept=%s sparse_added=%s final=%s rrf_top=%s"
+        "[HYBRID][UNION] dense_kept=%s sparse_added=%s final=%s pre_cap=%s cap=%s overlap_avg=%.2f overlap_max=%s rrf_top=%s"
         % (
             len(dense_ids),
             sparse_added,
             len(job_data_with_ids),
+            pre_cap_count,
+            candidate_cap,
+            overlap_avg,
+            overlap_max,
             ",".join(ranked_ids[:5]),
         )
     )
