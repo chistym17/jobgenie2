@@ -24,6 +24,7 @@ import {
 } from "../../components/v2/DashboardSkeletons";
 import { useActivityTimeline } from "../../hooks/useActivityTimeline";
 import { useRouter } from "next/navigation";
+import type { ActivityEvent } from "../../hooks/useActivityTimeline";
 
 const statusConfig: Record<
   string,
@@ -87,6 +88,32 @@ const statusConfig: Record<
     icon: <AlertTriangle className="h-3.5 w-3.5" />,
   },
 };
+
+function recommendationProgressFromActivities(activities: ActivityEvent[]) {
+  if (!activities.length) {
+    return { percent: 0, message: "Starting recommendations...", stageKey: "none", done: false, failed: false };
+  }
+  const steps = new Set(activities.map((a) => String(a.step || "")));
+  if (steps.has("Recommendations Ready")) {
+    return { percent: 100, message: "Recommendations are ready!", stageKey: "done", done: true, failed: false };
+  }
+  if (steps.has("Processing Failed") || steps.has("Quota Exceeded")) {
+    return { percent: 100, message: "Could not finish recommendations.", stageKey: "failed", done: false, failed: true };
+  }
+  if (steps.has("Finalizing")) {
+    return { percent: 80, message: "Putting it all together...", stageKey: "final", done: false, failed: false };
+  }
+  if (steps.has("Comparing Results")) {
+    return { percent: 60, message: "Comparing and improving results...", stageKey: "compare", done: false, failed: false };
+  }
+  if (steps.has("Finding Matches") || steps.has("Generating Recommendations")) {
+    return { percent: 40, message: "Finding the best matches...", stageKey: "find", done: false, failed: false };
+  }
+  if (steps.has("Starting Recommendations")) {
+    return { percent: 20, message: "Starting recommendations...", stageKey: "start", done: false, failed: false };
+  }
+  return { percent: 20, message: "Starting recommendations...", stageKey: "start", done: false, failed: false };
+}
 
 interface NewUploadTabProps {
   file: File | null;
@@ -417,11 +444,29 @@ export default function ResumeUploadsDashboard() {
   } = useRecommendationHistory(userEmail);
   const [statusNonce, setStatusNonce] = useState(0);
   const [startingRecFor, setStartingRecFor] = useState<string | null>(null);
+  const [showRecProgressModal, setShowRecProgressModal] = useState(false);
+  const [minimizeRecProgress, setMinimizeRecProgress] = useState(false);
   const {
     status: focusedStatus,
     errorMessage: focusedErrorMessage,
     isLoading: isFocusedStatusLoading,
   } = useUploadStatus(focusedUploadId, !!focusedUploadId, statusNonce);
+  const { activities: focusedActivities } = useActivityTimeline(focusedUploadId);
+  const recProgress = useMemo(
+    () => recommendationProgressFromActivities(focusedActivities),
+    [focusedActivities]
+  );
+  const progressState = useMemo(() => {
+    if (focusedStatus === "completed") {
+      return { percent: 100, message: "Recommendations are ready!", stageKey: "done", done: true, failed: false };
+    }
+    if (focusedStatus === "failed") {
+      return { percent: 100, message: "Could not finish recommendations.", stageKey: "failed", done: false, failed: true };
+    }
+    return recProgress;
+  }, [focusedStatus, recProgress]);
+  const lastProgressToastRef = useRef<string>("");
+  const recStageToastCooldownUntilRef = useRef<number>(0);
   const [detailUploadId, setDetailUploadId] = useState<string | null>(null);
   const {
     data: detail,
@@ -456,6 +501,10 @@ export default function ResumeUploadsDashboard() {
       return;
     }
     setStartingRecFor(uploadId);
+    setActiveTab("recommendations");
+    if (focusedUploadId !== uploadId) {
+      router.push(`/uploads?upload_id=${encodeURIComponent(uploadId)}`);
+    }
     try {
       const res = await fetch(
         `${backendV2Base}/resume/upload/${encodeURIComponent(uploadId)}/recommendations?user_email=${encodeURIComponent(userEmail)}`,
@@ -464,6 +513,7 @@ export default function ResumeUploadsDashboard() {
       const payload = (await res.json().catch(() => ({}))) as {
         detail?: unknown;
         message?: string;
+        status?: string;
       };
       if (!res.ok) {
         const d = payload?.detail;
@@ -477,15 +527,21 @@ export default function ResumeUploadsDashboard() {
       refetchHistory();
       refetchQuota();
       setStatusNonce((n) => n + 1);
-      setExtraToasts((prev) => [
-        ...prev,
-        {
-          id: `rec-ok-${crypto.randomUUID()}`,
-          message: payload?.message || "Finding job matches for your profile.",
-          type: "info",
-          durationMs: 4000,
-        },
-      ]);
+      if (payload?.status === "recommendations") {
+        setShowRecProgressModal(true);
+        setMinimizeRecProgress(false);
+      } else if (payload?.status === "completed") {
+        setShowRecProgressModal(false);
+        setExtraToasts((prev) => [
+          ...prev,
+          {
+            id: `rec-ready-${crypto.randomUUID()}`,
+            message: "Recommendations are ready!",
+            type: "success",
+            durationMs: 2600,
+          },
+        ]);
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to start recommendations";
       setExtraToasts((prev) => [...prev, { id: `rec-err-${crypto.randomUUID()}`, message: msg, type: "error" }]);
@@ -493,6 +549,75 @@ export default function ResumeUploadsDashboard() {
       setStartingRecFor(null);
     }
   };
+
+  useEffect(() => {
+    if (focusedStatus === "recommendations") {
+      setShowRecProgressModal(true);
+    }
+    console.log("[rec-progress][status]", {
+      focusedUploadId,
+      focusedStatus,
+      activitiesCount: focusedActivities.length,
+    });
+  }, [focusedStatus]);
+
+  useEffect(() => {
+    if (!focusedUploadId) return;
+    if (focusedStatus !== "recommendations" && focusedStatus !== "completed" && focusedStatus !== "failed") {
+      return;
+    }
+    if (!progressState.stageKey || progressState.stageKey === "none") {
+      console.log("[rec-progress][toast-skip]", {
+        focusedUploadId,
+        focusedStatus,
+        reason: "no_stage",
+        progressState,
+      });
+      return;
+    }
+    if (Date.now() < recStageToastCooldownUntilRef.current) return;
+    const toastKey = `${focusedUploadId}:${progressState.stageKey}`;
+    if (lastProgressToastRef.current === toastKey) {
+      console.log("[rec-progress][toast-skip]", {
+        focusedUploadId,
+        focusedStatus,
+        reason: "same_stage",
+        toastKey,
+      });
+      return;
+    }
+    lastProgressToastRef.current = toastKey;
+    console.log("[rec-progress][toast-stage]", {
+      focusedUploadId,
+      focusedStatus,
+      stage: progressState.stageKey,
+      percent: progressState.percent,
+      message: progressState.message,
+      steps: focusedActivities.map((a) => `${a.step}:${a.status}`),
+    });
+    if (progressState.stageKey === "done") {
+      setExtraToasts((prev) => [
+        ...prev,
+        { id: `rec-stage-${crypto.randomUUID()}`, message: "Recommendations are ready!", type: "success", durationMs: 3000 },
+      ]);
+      recStageToastCooldownUntilRef.current = Date.now() + 3400;
+      setTimeout(() => setShowRecProgressModal(false), 1200);
+      return;
+    }
+    if (progressState.stageKey === "failed") {
+      setExtraToasts((prev) => [
+        ...prev,
+        { id: `rec-stage-${crypto.randomUUID()}`, message: "Could not finish recommendations.", type: "error", durationMs: 4000 },
+      ]);
+      recStageToastCooldownUntilRef.current = Date.now() + 4300;
+      return;
+    }
+    setExtraToasts((prev) => [
+      ...prev,
+      { id: `rec-stage-${crypto.randomUUID()}`, message: progressState.message, type: "info", durationMs: 2200 },
+    ]);
+    recStageToastCooldownUntilRef.current = Date.now() + 2500;
+  }, [focusedUploadId, focusedStatus, progressState, focusedActivities]);
 
   const redirectInFlightRef = useRef(false);
   useEffect(() => {
@@ -1035,6 +1160,45 @@ export default function ResumeUploadsDashboard() {
           </div>
         </main>
       </div>
+
+      {showRecProgressModal && focusedStatus === "recommendations" && focusedUploadId && !minimizeRecProgress && (
+        <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMinimizeRecProgress(true)} />
+          <div className="relative z-10 w-full max-w-md rounded-2xl border border-white/15 bg-black/85 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-white">Creating recommendations</p>
+                <p className="text-xs text-brand-muted mt-1">{progressState.message}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMinimizeRecProgress(true)}
+                className="text-xs text-brand-muted hover:text-white"
+              >
+                Minimize
+              </button>
+            </div>
+            <div className="mt-4">
+              <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                <div
+                  className="h-full bg-brand-primary rounded-full transition-all duration-500"
+                  style={{ width: `${Math.max(8, progressState.percent)}%` }}
+                />
+              </div>
+              <div className="mt-2 text-[11px] text-brand-muted">{progressState.percent}%</div>
+            </div>
+          </div>
+        </div>
+      )}
+      {showRecProgressModal && focusedStatus === "recommendations" && focusedUploadId && minimizeRecProgress && (
+        <button
+          type="button"
+          onClick={() => setMinimizeRecProgress(false)}
+          className="fixed top-24 right-6 z-40 rounded-full border border-white/15 bg-black/75 px-4 py-2 text-xs text-white hover:bg-black/90"
+        >
+          Recommendations in progress ({progressState.percent}%)
+        </button>
+      )}
 
       <ToastContainer toasts={mergedToasts} onClose={handleToastClose} />
 

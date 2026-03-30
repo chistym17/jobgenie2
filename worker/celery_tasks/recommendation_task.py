@@ -25,6 +25,9 @@ def generate_recommendations_task(user_email: str, upload_id: str | None = None,
             update_upload_status(upload_id, "recommendations")
             logger.info("Recommendations started for upload_id=%s user_email=%s", upload_id, user_email)
             
+            if upload_id:
+                add_activity_event(upload_id, "Finding Matches", "Finding the best matches...", "in_progress")
+
             if not force_refresh:
                 existing = check_existing_recommendations(upload_id)
                 if existing:
@@ -49,6 +52,9 @@ def generate_recommendations_task(user_email: str, upload_id: str | None = None,
                     )
                     return []
         
+        if upload_id:
+            add_activity_event(upload_id, "Comparing Results", "Comparing and improving results...", "in_progress")
+
         service = RecommenderService()
         recommendations = service.generate_recommendations(user_email)
 
@@ -61,6 +67,8 @@ def generate_recommendations_task(user_email: str, upload_id: str | None = None,
                 resume_id = str(upload_doc.get("resume_id", "")) if upload_doc and upload_doc.get("resume_id") else None
             finally:
                 client.close()
+
+            add_activity_event(upload_id, "Finalizing", "Putting it all together...", "in_progress")
 
             recommendation_id = save_recommendations(
                 upload_id=upload_id,

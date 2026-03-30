@@ -32,8 +32,8 @@ const STATUS_TO_TOAST: Record<string, { message: string; type: 'success' | 'info
   parsed: { message: 'Resume parsed successfully', type: 'success' },
   embedding: { message: 'Creating embeddings...', type: 'info' },
   embedding_completed: { message: 'Resume ready — you can create recommendations when you want.', type: 'success' },
-  recommendations: { message: 'Finding job matches...', type: 'info' },
-  completed: { message: 'Recommendations ready!', type: 'success' },
+  recommendations: { message: '', type: 'info' },
+  completed: { message: '', type: 'success' },
   failed: { message: 'Processing failed', type: 'error' },
   parsing_failed: { message: 'Parsing failed', type: 'error' },
   embedding_failed: { message: 'Embedding failed', type: 'error' },
@@ -208,7 +208,7 @@ export function useNotifications(uploadId: string | null, currentStatus: string 
       });
 
       const toastInfo = STATUS_TO_TOAST[currentStatus];
-      if (toastInfo && prevStatusRef.current !== null) {
+      if (toastInfo && toastInfo.message && prevStatusRef.current !== null) {
         const toastId = `toast-${Date.now()}`;
         setToasts([{ id: toastId, message: toastInfo.message, type: toastInfo.type }]);
       }

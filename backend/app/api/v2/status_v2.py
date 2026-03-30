@@ -148,8 +148,8 @@ async def start_recommendations(
 
     await resume_upload_service.add_activity_event(
         upload_id,
-        "Generating Recommendations",
-        "Finding the best job matches for your profile",
+        "Starting Recommendations",
+        "Starting recommendations...",
         "in_progress",
     )
 

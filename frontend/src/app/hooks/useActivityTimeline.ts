@@ -25,19 +25,15 @@ export function useActivityTimeline(uploadId: string | null) {
     if (activities.length === 0) return false;
     
     const lastActivity = activities[activities.length - 1];
-    const terminalStatuses: ActivityEvent["status"][] = ["completed", "failed"];
     
-    // Stop polling if last activity is in a terminal state
-    if (terminalStatuses.includes(lastActivity.status)) {
-      return true;
-    }
-    
-    // Also check if the step indicates completion or failure
+    // Stop polling only for final recommendation completion/failure states.
+    // Do not stop on intermediate "completed" steps like "Parsing Completed".
     const terminalSteps = [
       "Recommendations Ready",
       "Processing Failed",
       "Parsing Failed",
-      "Embedding Failed"
+      "Embedding Failed",
+      "Quota Exceeded",
     ];
     
     if (terminalSteps.some(step => lastActivity.step.includes(step))) {
@@ -85,6 +81,15 @@ export function useActivityTimeline(uploadId: string | null) {
         if (cancelled) return;
         
         const newActivities = data.activity_timeline || [];
+        const steps = Array.isArray(newActivities)
+          ? newActivities.map((a: ActivityEvent) => `${a.step}:${a.status}`)
+          : [];
+        console.log("[rec-progress][poll]", {
+          uploadId,
+          isInitial,
+          count: newActivities.length,
+          steps,
+        });
         
         // Check if we should stop polling
         const shouldStop = shouldStopPollingCheck(newActivities);
@@ -94,6 +99,7 @@ export function useActivityTimeline(uploadId: string | null) {
             clearInterval(intervalId);
             intervalId = null;
           }
+          console.log("[rec-progress][stop]", { uploadId, reason: "terminal_activity" });
         }
         
         // Only update if activities have actually changed
@@ -126,6 +132,11 @@ export function useActivityTimeline(uploadId: string | null) {
       } catch (err: any) {
         if (cancelled) return;
         setError(err.message || "Unknown error");
+        console.log("[rec-progress][error]", {
+          uploadId,
+          isInitial,
+          message: err?.message || "Unknown error",
+        });
         if (isInitial) {
           setIsInitialLoad(false);
         }
@@ -139,7 +150,7 @@ export function useActivityTimeline(uploadId: string | null) {
     // Initial fetch
     fetchActivities(true);
     
-    // Poll for updates every 2 seconds (without showing loading)
+    // Poll for updates every 1 second (without showing loading)
     intervalId = setInterval(() => {
       if (!shouldStopRef.current && !cancelled) {
         fetchActivities(false);
@@ -147,7 +158,7 @@ export function useActivityTimeline(uploadId: string | null) {
         clearInterval(intervalId);
         intervalId = null;
       }
-    }, 2000);
+    }, 1000);
 
     return () => {
       cancelled = true;
