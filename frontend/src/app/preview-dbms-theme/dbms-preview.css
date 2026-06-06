@@ -1,0 +1,102 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+.dbms-preview {
+  --background: 220 10% 6%;
+  --foreground: 210 20% 90%;
+  --card: 220 10% 8%;
+  --card-foreground: 210 20% 90%;
+  --primary: 0 0% 100%;
+  --primary-foreground: 220 10% 6%;
+  --secondary: 220 10% 12%;
+  --secondary-foreground: 210 20% 85%;
+  --muted: 220 10% 15%;
+  --muted-foreground: 210 15% 55%;
+  --border: 220 10% 15%;
+  --surface-sunken: 220 10% 5%;
+  --radius: 0.75rem;
+  --shadow-neumorphic-dark: 8px 8px 16px hsl(220 10% 3%);
+  --shadow-neumorphic-light: -8px -8px 16px hsl(220 10% 12%);
+  --shadow-neumorphic-inset: inset 4px 4px 8px hsl(220 10% 4%), inset -4px -4px 8px hsl(220 10% 10%);
+
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.dbms-preview h1,
+.dbms-preview h2,
+.dbms-preview h3,
+.dbms-preview h4,
+.dbms-preview h5,
+.dbms-preview h6 {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.dbms-preview .dbms-neumorphic-card {
+  background: hsl(var(--card));
+  box-shadow: var(--shadow-neumorphic-dark), var(--shadow-neumorphic-light);
+  border-radius: 1rem;
+  border: 1px solid hsl(var(--border));
+}
+
+.dbms-preview .dbms-flat-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+}
+
+.dbms-preview .dbms-btn-primary {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-radius: var(--radius);
+  font-weight: 500;
+  transition: opacity 0.2s ease;
+}
+
+.dbms-preview .dbms-btn-primary:hover {
+  opacity: 0.9;
+}
+
+.dbms-preview .dbms-btn-outline {
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+  border-radius: var(--radius);
+  background: transparent;
+  transition: background 0.2s ease;
+}
+
+.dbms-preview .dbms-btn-outline:hover {
+  background: hsl(var(--muted));
+}
+
+.dbms-preview .dbms-text-muted {
+  color: hsl(var(--muted-foreground));
+}
+
+.dbms-preview .dbms-text-gradient {
+  background: linear-gradient(135deg, hsl(var(--foreground)), hsl(var(--muted-foreground)));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.dbms-preview .dbms-badge {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.75rem;
+}
+
+.dbms-preview .dbms-preview-banner {
+  background: hsl(var(--secondary));
+  border-bottom: 1px solid hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  text-align: center;
+  padding: 0.5rem 1rem;
+}

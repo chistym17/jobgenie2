@@ -32,6 +32,11 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
+class ClerkSync(BaseModel):
+    clerk_id: str
+    email: EmailStr
+    name: str = ""
+
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
@@ -52,6 +57,7 @@ def signup(user: UserSignup):
     hashed_password = get_password_hash(user.password)
     user_dict = user.dict()
     user_dict["password"] = hashed_password
+    user_dict["authProvider"] = "local"
     users_collection.insert_one(user_dict)
     access_token = create_access_token({"sub": user.email, "name": user.name})
     return {"access_token": access_token, "token_type": "bearer"}
@@ -63,6 +69,30 @@ def login(user: UserLogin):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     access_token = create_access_token({"sub": db_user["email"], "name": db_user.get("name", "")})
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.post("/clerk-sync")
+def clerk_sync(payload: ClerkSync):
+    existing = users_collection.find_one({
+        "$or": [{"email": payload.email}, {"clerkId": payload.clerk_id}]
+    })
+    if existing:
+        users_collection.update_one(
+            {"_id": existing["_id"]},
+            {"$set": {
+                "clerkId": payload.clerk_id,
+                "email": payload.email,
+                "name": payload.name or existing.get("name", ""),
+                "authProvider": "clerk",
+            }}
+        )
+    else:
+        users_collection.insert_one({
+            "clerkId": payload.clerk_id,
+            "email": payload.email,
+            "name": payload.name,
+            "authProvider": "clerk",
+        })
+    return {"ok": True}
 
 # Optional: Dependency for protected routes
 def get_current_user(token: str = Depends(lambda: None)):

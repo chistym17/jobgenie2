@@ -7,6 +7,7 @@ import { Toaster, toast } from "sonner";
 import AuthShell from "../components/v2/auth/AuthShell";
 import AuthInput from "../components/v2/auth/AuthInput";
 import PrimaryButton from "../components/v2/auth/PrimaryButton";
+import GoogleSignInButton from "../components/GoogleSignInButton";
 import { safeRedirectPath } from "../utils/auth";
 
 function SignupForm() {
@@ -55,6 +56,15 @@ function SignupForm() {
   return (
     <AuthShell title="Join Jobgenie" subtitle="Create an account to get curated matches and guidance">
       <Toaster position="top-center" richColors />
+      <GoogleSignInButton redirectPath={nextPath} />
+      <div className="relative py-2">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-brand-border" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-brand px-2 text-brand-muted">or</span>
+        </div>
+      </div>
       <form onSubmit={handleSubmit} className="space-y-5">
         <AuthInput
           id="name"

@@ -8,6 +8,7 @@ import AuthShell from "../components/v2/auth/AuthShell";
 import AuthInput from "../components/v2/auth/AuthInput";
 import PrimaryButton from "../components/v2/auth/PrimaryButton";
 import DemoBanner from "../components/v2/auth/DemoBanner";
+import GoogleSignInButton from "../components/GoogleSignInButton";
 import { safeRedirectPath } from "../utils/auth";
 
 function LoginForm() {
@@ -75,6 +76,15 @@ function LoginForm() {
   return (
     <AuthShell title="Welcome back" subtitle="Log in to continue your Jobgenie journey">
       <Toaster position="top-center" richColors />
+      <GoogleSignInButton redirectPath={nextPath} />
+      <div className="relative py-2">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-brand-border" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-brand px-2 text-brand-muted">or</span>
+        </div>
+      </div>
       <DemoBanner loading={demoLoading} onClick={handleDemoLogin} />
       <form onSubmit={handleSubmit} className="space-y-5">
         <AuthInput
