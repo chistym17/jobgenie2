@@ -34,3 +34,4 @@ google-genai
 PyPDF2
 celery
 redis
+qdrant-client

@@ -13,8 +13,6 @@ from pymongo.errors import ConfigurationError
 from dotenv import load_dotenv
 load_dotenv()
 
-MAX_JOBS_PER_DAY = 10
-
 def clean_text(text: str) -> str:
     if not text:
         return ""
@@ -166,12 +164,9 @@ def main():
 
     unique_jobs.sort(key=lambda x: x['date'], reverse=True)
 
-    jobs_before_limit = len(unique_jobs)
-    unique_jobs = unique_jobs[:MAX_JOBS_PER_DAY]
-
     save_to_mongodb(unique_jobs)
 
-    print(f"\nTotal engineering jobs fetched: {jobs_before_limit} (limited to {MAX_JOBS_PER_DAY} per day)")
+    print(f"\nTotal engineering jobs fetched: {len(unique_jobs)}")
     print(f" - WWR: {len(wwr_jobs)}")
     print(f" - Remote OK: {len(remoteok_jobs)}")
     print("\nSample (first 3 jobs or fewer):")
