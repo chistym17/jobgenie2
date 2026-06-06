@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Briefcase, ChevronRight, Link2, Sparkles, X } from "lucide-react";
+import { Briefcase, ChevronRight, Link2, Sparkles, X } from "lucide-react";
 import Navbar from "./Navbar";
 import { useSearchParams } from "next/navigation";
 import { useCurrentUser } from "../../hooks/useCurrentUser";
@@ -40,6 +40,40 @@ function normalizeCoachBullets(value: unknown): string[] {
       .filter(Boolean);
   }
   return [];
+}
+
+function isPlaceholderValue(value?: string | null): boolean {
+  if (!value) return true;
+  const t = value.trim().toLowerCase();
+  return (
+    !t ||
+    t === "n/a" ||
+    t === "na" ||
+    t === "unknown" ||
+    t === "not specified" ||
+    t === "not available" ||
+    t === "unspecified" ||
+    t === "none" ||
+    t === "-" ||
+    t === "null"
+  );
+}
+
+function parseMatchScore(raw: unknown): number {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return Math.max(0, Math.min(100, Math.round(raw)));
+  }
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (isPlaceholderValue(trimmed)) return 0;
+    const num = Number(trimmed.replace(/%/g, ""));
+    if (Number.isFinite(num)) return Math.max(0, Math.min(100, Math.round(num)));
+  }
+  return 0;
+}
+
+function cleanDisplayField(value: string): string {
+  return isPlaceholderValue(value) ? "" : value.trim();
 }
 
 function CoachInsightBlock({
@@ -172,6 +206,15 @@ function MatchScoreBadge({ score }: { score: number }) {
   );
 }
 
+function MatchScoreLabel({ score }: { score: number }) {
+  if (score <= 0) return null;
+  return (
+    <span className="v2-status v2-status-ready text-[10px] sm:text-xs">
+      {Math.round(score)}% match
+    </span>
+  );
+}
+
 function JobListItem({
   rec,
   isSelected,
@@ -213,14 +256,15 @@ function JobListItem({
         <div className="min-w-0 flex-1">
           <div className="font-medium text-sm truncate">{rec.jobTitle}</div>
           <div className="v2-text-muted text-xs mt-0.5 truncate">{rec.companyName}</div>
-          <div className="flex flex-wrap gap-1.5 mt-2">
-            {rec.location && (
+          <div className="flex flex-wrap gap-1.5 mt-2 items-center">
+            <MatchScoreLabel score={rec.matchScore} />
+            {!isPlaceholderValue(rec.location) && (
               <span className="text-[11px] v2-text-muted truncate max-w-full">{rec.location}</span>
             )}
-            {rec.salary && (
+            {!isPlaceholderValue(rec.salary) && (
               <span className="v2-badge text-[10px] py-0.5 px-2">{rec.salary}</span>
             )}
-            {rec.jobType && (
+            {!isPlaceholderValue(rec.jobType) && (
               <span className="v2-badge text-[10px] py-0.5 px-2">{rec.jobType}</span>
             )}
           </div>
@@ -238,16 +282,23 @@ function JobDetailContent({ job }: { job: Recommendation }) {
         <h2 className="text-xl font-semibold leading-tight">{job.jobTitle}</h2>
         <p className="v2-text-muted text-sm mt-1">{job.companyName}</p>
         <div className="flex flex-wrap items-center gap-2 mt-3">
-          {job.matchScore > 0 && (
-            <span className="v2-status v2-status-ready">{Math.round(job.matchScore)}% match</span>
+          <MatchScoreLabel score={job.matchScore} />
+          {!isPlaceholderValue(job.location) && (
+            <span className="v2-badge text-xs">{job.location}</span>
           )}
-          {job.location && <span className="v2-badge text-xs">{job.location}</span>}
-          {job.jobType && <span className="v2-badge text-xs">{job.jobType}</span>}
-          {job.salary && <span className="v2-badge text-xs">{job.salary}</span>}
+          {!isPlaceholderValue(job.jobType) && (
+            <span className="v2-badge text-xs">{job.jobType}</span>
+          )}
+          {!isPlaceholderValue(job.salary) && (
+            <span className="v2-badge text-xs">{job.salary}</span>
+          )}
         </div>
-        {job.stack.length > 0 && (
+        {job.stack.filter((s) => !isPlaceholderValue(s)).length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-3">
-            {job.stack.slice(0, 8).map((skill) => (
+            {job.stack
+              .filter((s) => !isPlaceholderValue(s))
+              .slice(0, 8)
+              .map((skill) => (
               <span key={skill} className="v2-badge text-[11px]">
                 {skill}
               </span>
@@ -626,25 +677,24 @@ export default function RecommendationsPreviewPage() {
         const jobType = item["Job Type"] ?? item.jobType ?? "";
         const salary = item["Salary"] ?? item.salary ?? "";
         const matchScoreRaw = item["Match Score"] ?? item.matchScore ?? 0;
-        const matchScore =
-          typeof matchScoreRaw === "number"
-            ? matchScoreRaw
-            : Number.isFinite(Number(matchScoreRaw))
-              ? Number(matchScoreRaw)
-              : 0;
+        const matchScore = parseMatchScore(matchScoreRaw);
         const directLink = item["Direct Link"] ?? item.directLink ?? undefined;
-        const stack = normalizeStack(item["Stack"] ?? item.stack ?? item["Bonus Skills"] ?? "");
+        const stack = normalizeStack(item["Stack"] ?? item.stack ?? item["Bonus Skills"] ?? "").filter(
+          (s) => !isPlaceholderValue(s)
+        );
         const description = item["Description"] ?? item.description ?? "";
         const keyRequirements = item["Key Requirements"] ?? item.keyRequirements ?? "";
-        const keyRequirementItems = splitKeyRequirements(String(keyRequirements));
+        const keyRequirementItems = splitKeyRequirements(String(keyRequirements)).filter(
+          (line) => !isPlaceholderValue(line)
+        );
 
         return {
           id: item.id ?? item._id ?? `rec-${idx}`,
-          jobTitle: String(jobTitle),
-          companyName: String(companyName),
-          location: String(location),
-          jobType: String(jobType),
-          salary: String(salary),
+          jobTitle: cleanDisplayField(String(jobTitle)) || String(jobTitle).trim(),
+          companyName: cleanDisplayField(String(companyName)) || String(companyName).trim(),
+          location: cleanDisplayField(String(location)),
+          jobType: cleanDisplayField(String(jobType)),
+          salary: cleanDisplayField(String(salary)),
           matchScore,
           directLink: directLink ? String(directLink) : undefined,
           stack,
@@ -787,26 +837,19 @@ export default function RecommendationsPreviewPage() {
     <>
       <Navbar />
 
-      <main className="pt-6 pb-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <header className="mb-6">
-            <Link
-              href={dashboardHref}
-              className="inline-flex items-center gap-1.5 text-xs v2-text-muted hover:opacity-80 transition-opacity mb-4"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Back to dashboard
-            </Link>
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <main className="v2-rec-main pt-3 pb-3 px-4 sm:px-6 lg:px-8">
+        <div className="v2-rec-main-inner max-w-7xl mx-auto w-full">
+          <header className="mb-3 shrink-0">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide v2-text-muted mb-1">
+                <p className="text-xs font-medium uppercase tracking-wide v2-text-muted mb-0.5">
                   {linkedUpload?.file_name
                     ? `Matches for ${linkedUpload.file_name}`
                     : uploadId
                       ? "Job matches"
                       : "Sample recommendations"}
                 </p>
-                <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Your recommendations</h1>
+                <h1 className="text-xl md:text-2xl font-semibold tracking-tight">Your recommendations</h1>
               </div>
               {!isLoadingRecommendations && recommendations.length > 0 && (
                 <div className="flex flex-wrap gap-2">
@@ -835,9 +878,9 @@ export default function RecommendationsPreviewPage() {
               </Link>
             </div>
           ) : (
-            <div className="v2-rec-master-detail gap-5 lg:gap-6">
-              <section className="v2-neumorphic-card p-3 sm:p-4 flex flex-col min-h-0">
-                <div className="flex items-center justify-between gap-2 px-1 pb-3 border-b border-[hsl(var(--border))] shrink-0">
+            <div className="v2-rec-master-detail gap-4 lg:gap-5 flex-1 min-h-0">
+              <section className="v2-rec-panel v2-neumorphic-card p-3 sm:p-4 flex flex-col">
+                <div className="v2-rec-panel-header flex items-center justify-between gap-2 px-1 pb-3 border-b border-[hsl(var(--border))]">
                   <h2 className="text-sm font-semibold">Roles</h2>
                   <span className="text-xs v2-text-muted">Sorted by match</span>
                 </div>
@@ -854,16 +897,16 @@ export default function RecommendationsPreviewPage() {
                 </div>
               </section>
 
-              <section className="hidden lg:block v2-neumorphic-card p-5 sm:p-6">
+              <section className="v2-rec-panel v2-neumorphic-card p-5 sm:p-6 hidden lg:flex flex-col">
                 {selected ? (
-                  <>
+                  <div className="v2-rec-detail-body flex-1">
                     <JobDetailContent job={selected} />
                     <CoachLaunchCard
                       onOpen={() => setCoachModalOpen(true)}
                       hasInsight={!!coachResult}
                       disabled={!uploadId}
                     />
-                  </>
+                  </div>
                 ) : (
                   <p className="v2-text-muted text-sm">Select a role to view details.</p>
                 )}

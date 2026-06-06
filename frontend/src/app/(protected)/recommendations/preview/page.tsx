@@ -3,7 +3,7 @@ import "../../../v2/v2-theme.css";
 
 export default function RecommendationsPreviewRoute() {
   return (
-    <div className="v2-shell min-h-screen">
+    <div className="v2-shell v2-rec-page">
       <RecommendationsPreviewPage />
     </div>
   );
