@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, User, Lock, ArrowRight } from "lucide-react";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
+import V2Toaster from "../V2Toaster";
 import AuthShell from "./AuthShell";
 import AuthInput from "./AuthInput";
 import PrimaryButton from "./PrimaryButton";
@@ -54,7 +55,7 @@ export default function SignupForm() {
 
   return (
     <AuthShell title="Join Jobgenie" subtitle="Create an account to get curated matches and guidance">
-      <Toaster position="top-center" richColors />
+      <V2Toaster />
       <GoogleSignInButton redirectPath={nextPath} className="v2-google-btn" />
       <div className="relative py-2">
         <div className="absolute inset-0 flex items-center">
