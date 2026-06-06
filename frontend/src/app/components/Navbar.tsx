@@ -3,6 +3,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Search, User, Menu, X } from 'lucide-react';
 import { useState } from 'react';
+import ClerkUserMenu from './ClerkUserMenu';
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { useRouter } from "next/navigation";
 
@@ -14,6 +15,49 @@ const Navbar = () => {
   const handleLogout = () => {
     localStorage.removeItem("token");
     router.push("/login");
+  };
+
+  const renderUserSection = () => {
+    if (!user) {
+      return (
+        <>
+          <Link href="/login" className="text-blue-600 hover:underline font-medium">
+            Login
+          </Link>
+          <Link href="/signup" className="text-green-600 hover:underline font-medium">
+            Signup
+          </Link>
+        </>
+      );
+    }
+
+    if (user.authType === "clerk") {
+      return (
+        <div className="flex items-center gap-3">
+          <span className="text-gray-700 font-medium">{user.name || user.email}</span>
+          <ClerkUserMenu
+            triggerClassName="rounded-full overflow-hidden ring-2 ring-gray-200 hover:ring-gray-300 transition-all"
+            menuClassName="absolute right-0 mt-2 min-w-[9rem] rounded-xl border border-gray-200 bg-white shadow-lg py-1 z-50"
+            signOutClassName="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          />
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <span className="text-gray-700 font-medium flex items-center gap-2">
+          <User className="w-5 h-5" />
+          {user.name || user.email}
+        </span>
+        <button
+          onClick={handleLogout}
+          className="ml-2 px-4 py-2 rounded bg-red-500 hover:bg-red-600 text-white font-semibold transition"
+        >
+          Logout
+        </button>
+      </>
+    );
   };
 
   return (
@@ -76,29 +120,7 @@ const Navbar = () => {
             <Search size={20} className="text-gray-600" />
           </button>
           <div className="flex items-center gap-4">
-            {user ? (
-              <>
-                <span className="text-gray-700 font-medium flex items-center gap-2">
-                  <User className="w-5 h-5" />
-                  {user.name || user.email}
-                </span>
-                <button
-                  onClick={handleLogout}
-                  className="ml-2 px-4 py-2 rounded bg-red-500 hover:bg-red-600 text-white font-semibold transition"
-                >
-                  Logout
-                </button>
-              </>
-            ) : (
-              <>
-                <Link href="/login" className="text-blue-600 hover:underline font-medium">
-                  Login
-                </Link>
-                <Link href="/signup" className="text-green-600 hover:underline font-medium">
-                  Signup
-                </Link>
-              </>
-            )}
+            {renderUserSection()}
           </div>
         </div>
 
@@ -130,35 +152,7 @@ const Navbar = () => {
               Contact
             </Link>
             <div className="pt-4 flex flex-col space-y-3">
-              {user ? (
-                <>
-                  <span className="text-gray-700 font-medium flex items-center gap-2">
-                    <User className="w-5 h-5" />
-                    {user.name || user.email}
-                  </span>
-                  <button
-                    onClick={handleLogout}
-                    className="ml-2 px-4 py-2 rounded bg-red-500 hover:bg-red-600 text-white font-semibold transition"
-                  >
-                    Logout
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link
-                    href="/login"
-                    className="py-2 px-4 rounded-lg border border-blue-600 text-blue-600 text-center"
-                  >
-                    Sign In
-                  </Link>
-                  <Link
-                    href="/register"
-                    className="py-2 px-4 rounded-lg bg-blue-600 text-white text-center"
-                  >
-                    Sign Up
-                  </Link>
-                </>
-              )}
+              {renderUserSection()}
             </div>
           </div>
         </div>

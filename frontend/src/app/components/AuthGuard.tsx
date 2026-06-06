@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
 import { useCurrentUser } from "../hooks/useCurrentUser";
+import AuthLoadingScreen from "../v2/components/auth/AuthLoadingScreen";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -24,31 +24,12 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     router.replace(`/login?next=${encodeURIComponent(full)}`);
   }, [mounted, user, loading, router]);
 
-  if (!mounted) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#0a0a0f] text-[#E2E4E9]">
-        <Loader2 className="h-10 w-10 animate-spin text-brand-primary" aria-hidden />
-        <p className="text-sm text-[#E2E4E9]/70">Loading...</p>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#0a0a0f] text-[#E2E4E9]">
-        <Loader2 className="h-10 w-10 animate-spin text-brand-primary" aria-hidden />
-        <p className="text-sm text-[#E2E4E9]/70">Loading...</p>
-      </div>
-    );
+  if (!mounted || loading) {
+    return <AuthLoadingScreen message="Loading..." />;
   }
 
   if (!user) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#0a0a0f] text-[#E2E4E9]">
-        <Loader2 className="h-10 w-10 animate-spin text-brand-primary" aria-hidden />
-        <p className="text-sm text-[#E2E4E9]/70">Redirecting...</p>
-      </div>
-    );
+    return <AuthLoadingScreen message="Redirecting..." />;
   }
 
   return <>{children}</>;

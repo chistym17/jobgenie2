@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import React from "react";
 import Navbar from "./Navbar";
@@ -9,14 +9,13 @@ import Footer from "./Footer";
 
 const LandingPage = () => {
   return (
-    <div className="min-h-screen bg-brand text-brand">
-      <div className="noise-bg" />
+    <>
       <Navbar />
       <Hero />
       <FeatureGrid />
       <RecentMatches />
       <Footer />
-    </div>
+    </>
   );
 };
 

@@ -1,12 +1,15 @@
+"use client";
+
+import { useUser, useAuth } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
 
-interface User {
+export interface AppUser {
   email: string;
   name?: string;
-  [key: string]: any;
+  authType: "clerk" | "local";
 }
 
-function parseJwt(token: string): any {
+function parseJwt(token: string): Record<string, unknown> | null {
   try {
     const base64Url = token.split(".")[1];
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
@@ -19,36 +22,54 @@ function parseJwt(token: string): any {
         .join("")
     );
     return JSON.parse(jsonPayload);
-  } catch (e) {
+  } catch {
     return null;
   }
 }
 
-function getInitialAuthState(): { user: User | null; loading: boolean } {
-  return { user: null, loading: true };
-}
-
-function resolveAuthState(): { user: User | null; loading: boolean } {
-  if (typeof window === "undefined") {
-    return { user: null, loading: false };
-  }
+function resolveLocalUser(): AppUser | null {
+  if (typeof window === "undefined") return null;
   const token = localStorage.getItem("token");
-  if (!token) {
-    return { user: null, loading: false };
-  }
+  if (!token) return null;
   const payload = parseJwt(token);
-  if (payload && payload.sub) {
-    return { user: { email: payload.sub, name: payload.name }, loading: false };
+  if (payload && typeof payload.sub === "string") {
+    return {
+      email: payload.sub,
+      name: typeof payload.name === "string" ? payload.name : undefined,
+      authType: "local",
+    };
   }
-  return { user: null, loading: false };
+  return null;
 }
 
-export function useCurrentUser(): { user: User | null; loading: boolean } {
-  const [state, setState] = useState(getInitialAuthState);
+export function useCurrentUser(): { user: AppUser | null; loading: boolean } {
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+  const { isSignedIn } = useAuth();
+  const [localUser, setLocalUser] = useState<AppUser | null>(null);
+  const [localLoaded, setLocalLoaded] = useState(false);
 
   useEffect(() => {
-    setState(resolveAuthState());
+    setLocalUser(resolveLocalUser());
+    setLocalLoaded(true);
   }, []);
 
-  return { user: state.user, loading: state.loading };
+  if (!clerkLoaded || !localLoaded) {
+    return { user: null, loading: true };
+  }
+
+  if (isSignedIn && clerkUser) {
+    const email = clerkUser.primaryEmailAddress?.emailAddress;
+    if (email) {
+      return {
+        user: {
+          email,
+          name: clerkUser.fullName || clerkUser.firstName || undefined,
+          authType: "clerk",
+        },
+        loading: false,
+      };
+    }
+  }
+
+  return { user: localUser, loading: false };
 }

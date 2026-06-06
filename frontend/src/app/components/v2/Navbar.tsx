@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import ClerkUserMenu from "../ClerkUserMenu";
 import { useCurrentUser } from "../../hooks/useCurrentUser";
 
 const Navbar = () => {
@@ -13,6 +14,44 @@ const Navbar = () => {
     localStorage.removeItem("token");
     router.push("/login");
     router.refresh();
+  };
+
+  const renderAuthButton = () => {
+    if (loading) {
+      return (
+        <div
+          className="border border-[#E2E4E9]/30 px-5 py-2 rounded-full text-sm min-w-[5.5rem] flex items-center justify-center"
+          aria-busy
+        >
+          <Loader2 className="h-4 w-4 animate-spin opacity-80" aria-hidden />
+        </div>
+      );
+    }
+
+    if (user?.authType === "clerk") {
+      return <ClerkUserMenu />;
+    }
+
+    if (user?.authType === "local") {
+      return (
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="border border-[#E2E4E9]/30 px-5 py-2 rounded-full text-sm hover:bg-[#E2E4E9] hover:text-black transition-all"
+        >
+          Logout
+        </button>
+      );
+    }
+
+    return (
+      <a
+        href="/login"
+        className="border border-[#E2E4E9]/30 px-5 py-2 rounded-full text-sm hover:bg-[#E2E4E9] hover:text-black transition-all"
+      >
+        Login
+      </a>
+    );
   };
 
   return (
@@ -29,29 +68,7 @@ const Navbar = () => {
           </>
         ) : null}
       </div>
-      {loading ? (
-        <div
-          className="border border-[#E2E4E9]/30 px-5 py-2 rounded-full text-sm min-w-[5.5rem] flex items-center justify-center"
-          aria-busy
-        >
-          <Loader2 className="h-4 w-4 animate-spin opacity-80" aria-hidden />
-        </div>
-      ) : user ? (
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="border border-[#E2E4E9]/30 px-5 py-2 rounded-full text-sm hover:bg-[#E2E4E9] hover:text-black transition-all"
-        >
-          Logout
-        </button>
-      ) : (
-        <a
-          href="/login"
-          className="border border-[#E2E4E9]/30 px-5 py-2 rounded-full text-sm hover:bg-[#E2E4E9] hover:text-black transition-all"
-        >
-          Login
-        </a>
-      )}
+      {renderAuthButton()}
     </nav>
   );
 };
