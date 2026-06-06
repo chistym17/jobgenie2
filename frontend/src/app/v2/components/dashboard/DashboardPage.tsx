@@ -3,10 +3,10 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import Navbar from "../Navbar";
 import ConfirmationModal from "./ConfirmationModal";
-import { Upload, Clock, CheckCircle2, AlertTriangle, ArrowUpRight, Bell, Sparkles, X, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, Loader2 } from "lucide-react";
+import { Upload, Clock, CheckCircle2, AlertTriangle, ArrowUpRight, Activity, Briefcase, X, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, Loader2, Eye } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCurrentUser } from "../../../hooks/useCurrentUser";
-import { useUploadHistory } from "../../../hooks/useUploadHistory";
+import { useUploadHistory, type UploadHistoryItem } from "../../../hooks/useUploadHistory";
 import { useUploadStatus } from "../../../hooks/useUploadStatus";
 import { useResumeDetail } from "../../../hooks/useResumeDetail";
 import { useDeleteUpload } from "../../../hooks/useDeleteUpload";
@@ -70,7 +70,7 @@ const statusConfig: Record<
   recommendations: {
     label: "Matching jobs",
     className: "v2-status v2-status-progress",
-    icon: <Sparkles className="h-3.5 w-3.5" />,
+    icon: <Briefcase className="h-3.5 w-3.5" />,
   },
   embedding_failed: {
     label: "Failed",
@@ -115,6 +115,50 @@ function recommendationProgressFromActivities(activities: ActivityEvent[]) {
   return { percent: 20, message: "Starting recommendations...", stageKey: "start", done: false, failed: false };
 }
 
+type DashboardTab = "history" | "new" | "recommendations" | "notifications";
+
+const TAB_META: Record<DashboardTab, { title: string; description: string }> = {
+  history: {
+    title: "Upload history",
+    description: "Recent resumes you have analyzed. Select one to track progress and create recommendations.",
+  },
+  new: {
+    title: "New upload",
+    description: "Upload a PDF resume to start parsing and job matching.",
+  },
+  recommendations: {
+    title: "Your recommendations",
+    description: "Saved job match sets from processed resumes.",
+  },
+  notifications: {
+    title: "Activity",
+    description: "Step-by-step progress for your selected resume.",
+  },
+};
+
+const READY_STATUSES = new Set(["completed", "parsed", "embedding_completed"]);
+
+function formatUploadDate(value?: string) {
+  if (!value) return "Unknown date";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value.slice(0, 10) || value;
+  }
+  const diffMs = Date.now() - parsed.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+  if (diffHours < 1) return "Just now";
+  if (diffHours < 24) return `${Math.floor(diffHours)}h ago`;
+  if (diffHours < 48) return "Yesterday";
+  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function quotaBarClass(used: number, limit: number) {
+  const ratio = used / Math.max(1, limit);
+  if (ratio >= 1) return "v2-quota-fill-danger";
+  if (ratio >= 0.8) return "v2-quota-fill-warning";
+  return "v2-quota-fill";
+}
+
 interface NewUploadTabProps {
   file: File | null;
   setFile: (file: File | null) => void;
@@ -128,9 +172,10 @@ interface NewUploadTabProps {
   ) => Promise<{ upload_id: string; parse_task_id: string; status: string; message: string }>;
   isUploading: boolean;
   router: ReturnType<typeof useRouter>;
-  setActiveTab: (tab: "history" | "new" | "recommendations" | "notifications") => void;
+  setActiveTab: (tab: DashboardTab) => void;
   refetchHistory: () => void;
   onDuplicateFileReuse: (message: string) => void;
+  onValidationError: (message: string) => void;
 }
 
 function NewUploadTab({
@@ -146,15 +191,26 @@ function NewUploadTab({
   setActiveTab,
   refetchHistory,
   onDuplicateFileReuse,
+  onValidationError,
 }: NewUploadTabProps) {
+  const [dragActive, setDragActive] = useState(false);
+
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    setDragActive(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       validateAndSetFile(e.dataTransfer.files[0]);
     }
@@ -166,17 +222,17 @@ function NewUploadTab({
     }
   };
 
-  const validateAndSetFile = (file: File) => {
-    const validTypes = ['application/pdf'];
-    if (!validTypes.includes(file.type)) {
-      // Error will be shown via toast from uploadResume hook
+  const validateAndSetFile = (nextFile: File) => {
+    const validTypes = ["application/pdf"];
+    if (!validTypes.includes(nextFile.type)) {
+      onValidationError("Please upload a PDF file");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      // Error will be shown via toast from uploadResume hook
+    if (nextFile.size > 5 * 1024 * 1024) {
+      onValidationError("File size should not exceed 5MB");
       return;
     }
-    setFile(file);
+    setFile(nextFile);
   };
 
   const handleUpload = async () => {
@@ -206,27 +262,29 @@ function NewUploadTab({
   };
 
   return (
-    <div className="h-full">
-      <h2 className="text-xl sm:text-2xl font-semibold mb-2">
-        New upload
-      </h2>
-      <p className="text-sm sm:text-base v2-text-muted mb-4">
-        Start a fresh analysis with an updated resume.
-      </p>
-      
-      <div className="max-w-2xl mx-auto">
-        <div className="v2-flat-card p-4 md:p-6 rounded-3xl border border-[hsl(var(--border))]">
-          <div className="text-center mb-6">
-            <h3 className="text-xl font-semibold mb-2">Upload Your Resume</h3>
-            <p className="text-sm v2-text-muted">Get personalized job recommendations tailored to your skills</p>
-          </div>
+    <div className="h-full max-w-2xl mx-auto">
+      <div className="text-center mb-6">
+        <h3 className="text-lg font-semibold mb-2">Upload your resume</h3>
+        <p className="text-sm v2-text-muted">PDF only, up to 5MB</p>
+      </div>
 
-          {!file ? (
-            <div
-              className="v2-dropzone p-6 text-center cursor-pointer min-h-[280px] flex flex-col justify-center"
+      {!file ? (
+        <div
+          role="button"
+          tabIndex={0}
+          className={`v2-dropzone v2-dropzone-soft p-6 text-center cursor-pointer min-h-[280px] flex flex-col justify-center ${
+            dragActive ? "v2-dropzone-active" : ""
+          }`}
               onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onClick={triggerFileInput}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  triggerFileInput();
+                }
+              }}
             >
               <input
                 type="file"
@@ -236,21 +294,21 @@ function NewUploadTab({
                 onChange={handleFileChange}
               />
               <div className="flex justify-center mb-4">
-                <div className="v2-sunken p-4 rounded-full">
+                <div className="v2-feature-icon p-4 rounded-full">
                   <Upload className="h-6 w-6" />
                 </div>
               </div>
               <h3 className="font-medium text-base mb-2">Drag and drop your resume here</h3>
               <p className="v2-text-muted text-sm mb-4">Support for PDF (Max 5MB)</p>
-              <button className="v2-btn-primary px-5 py-2.5 rounded-lg text-sm font-medium mx-auto">
-                Browse Files
+              <button type="button" className="v2-btn-primary px-5 py-2.5 rounded-lg text-sm font-medium mx-auto">
+                Browse files
               </button>
             </div>
           ) : (
-            <div className="border-2 border-[hsl(var(--foreground)/0.15)] v2-file-selected rounded-2xl p-4 min-h-[280px] flex flex-col">
+            <div className="v2-file-selected rounded-2xl p-4 min-h-[280px] flex flex-col">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="v2-sunken p-2 rounded-xl shrink-0">
+                  <div className="v2-feature-icon p-2 rounded-xl shrink-0">
                     <FileText className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
@@ -284,17 +342,24 @@ function NewUploadTab({
             </div>
           )}
 
-          <div className="mt-6 text-center text-sm v2-text-muted">
-            <p>Your resume data is secure and will only be used to provide you with job recommendations.</p>
-            <p className="mt-2">By uploading, you agree to our <a href="#" className="v2-link-accent hover:opacity-80">Terms of Service</a> and <a href="#" className="v2-link-accent hover:opacity-80">Privacy Policy</a>.</p>
-          </div>
-        </div>
+      <div className="mt-6 text-center text-sm v2-text-muted">
+        <p>Your resume data is secure and used only to provide job recommendations.</p>
       </div>
     </div>
   );
 }
 
-function ActivityTimelineTab({ focusedUploadId }: { focusedUploadId: string | null }) {
+function ActivityTimelineTab({
+  focusedUploadId,
+  historyItems,
+  onSelectUpload,
+  onGoToUpload,
+}: {
+  focusedUploadId: string | null;
+  historyItems: UploadHistoryItem[];
+  onSelectUpload: (uploadId: string) => void;
+  onGoToUpload: () => void;
+}) {
   const { activities, isLoading } = useActivityTimeline(focusedUploadId);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 4;
@@ -330,23 +395,45 @@ function ActivityTimelineTab({ focusedUploadId }: { focusedUploadId: string | nu
 
   return (
     <div className="min-h-[500px]">
-      <h2 className="text-xl sm:text-2xl font-semibold mb-3">
-        Activity Timeline
-      </h2>
-      <p className="text-sm sm:text-base v2-text-muted mb-8">
-        Track the progress of your resume processing step by step.
-      </p>
-      
       {!focusedUploadId ? (
-        <div className="rounded-2xl v2-empty-state p-12 text-center text-base v2-text-muted min-h-[300px] flex items-center justify-center">
-          No active upload selected. Upload a resume to see progress here.
-        </div>
+        historyItems.length === 0 ? (
+          <div className="p-4 sm:p-6 text-center min-h-[280px] flex flex-col items-center justify-center gap-4">
+            <Activity className="h-8 w-8 v2-text-muted" />
+            <p className="text-sm">No uploads yet</p>
+            <p className="text-xs v2-text-muted max-w-sm">
+              Upload a resume first, then return here to follow each processing step.
+            </p>
+            <button type="button" onClick={onGoToUpload} className="v2-btn-primary px-5 py-2.5 text-sm rounded-lg">
+              Upload resume
+            </button>
+          </div>
+        ) : (
+          <div className="min-h-[280px]">
+            <p className="text-sm font-medium mb-1">Select a resume</p>
+            <p className="text-xs v2-text-muted mb-5">
+              Choose an upload to view its processing timeline.
+            </p>
+            <div className="space-y-2">
+              {historyItems.slice(0, 6).map((upload) => (
+                <button
+                  key={upload.upload_id}
+                  type="button"
+                  onClick={() => onSelectUpload(upload.upload_id)}
+                  className="v2-upload-picker-row flex items-center justify-between gap-3"
+                >
+                  <span className="text-sm font-medium truncate">{upload.file_name}</span>
+                  <span className="text-xs v2-text-muted shrink-0">{formatUploadDate(upload.created_at)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )
       ) : isLoading ? (
-        <div className="rounded-2xl v2-empty-state p-6 sm:p-10 min-h-[300px]">
+        <div className="min-h-[300px]">
           <ActivityTimelineSkeleton />
         </div>
       ) : activities.length === 0 ? (
-        <div className="rounded-2xl v2-empty-state p-12 text-center text-base v2-text-muted min-h-[300px] flex items-center justify-center">
+        <div className="p-8 text-center text-base v2-text-muted min-h-[300px] flex items-center justify-center">
           Waiting for processing to start...
         </div>
       ) : (
@@ -425,7 +512,7 @@ function ActivityTimelineTab({ focusedUploadId }: { focusedUploadId: string | nu
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"history" | "new" | "recommendations" | "notifications">("history");
+  const [activeTab, setActiveTab] = useState<DashboardTab>("history");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const searchParams = useSearchParams();
@@ -678,6 +765,41 @@ export default function DashboardPage() {
     }
   };
 
+  const focusUpload = (uploadId: string) => {
+    router.push(`/uploads?upload_id=${encodeURIComponent(uploadId)}`);
+  };
+
+  const clearFocusedUpload = () => {
+    router.push("/uploads");
+  };
+
+  const focusedUpload = useMemo(
+    () => historyItems.find((x) => x.upload_id === focusedUploadId) ?? null,
+    [historyItems, focusedUploadId]
+  );
+
+  const focusedEffectiveStatus =
+    focusedUploadId && focusedStatus ? focusedStatus : focusedUpload?.status ?? null;
+
+  const focusedStatusCfg =
+    focusedEffectiveStatus && statusConfig[focusedEffectiveStatus]
+      ? statusConfig[focusedEffectiveStatus]
+      : null;
+
+  const pushValidationError = (message: string) => {
+    setExtraToasts((prev) => [
+      ...prev,
+      { id: `val-${crypto.randomUUID()}`, message, type: "error" as const },
+    ]);
+  };
+
+  const sidebarTabs: { id: DashboardTab; label: string; icon: React.ReactNode }[] = [
+    { id: "history", label: "History", icon: <Clock className="h-5 w-5 flex-shrink-0" /> },
+    { id: "new", label: "Upload", icon: <Upload className="h-5 w-5 flex-shrink-0" /> },
+    { id: "recommendations", label: "Matches", icon: <Briefcase className="h-5 w-5 flex-shrink-0" /> },
+    { id: "notifications", label: "Activity", icon: <Activity className="h-5 w-5 flex-shrink-0" /> },
+  ];
+
   return (
     <>
       <Navbar />
@@ -701,71 +823,78 @@ export default function DashboardPage() {
               )}
             </button>
 
-            <nav className="flex-1 space-y-2">
-              <button
-                onClick={() => setActiveTab("history")}
-                className={`v2-sidebar-nav ${activeTab === "history" ? "v2-sidebar-nav-active" : ""}`}
-                title="Upload history"
-              >
-                <Clock className="h-5 w-5 flex-shrink-0" />
-                {!isSidebarCollapsed && (
-                  <span className="text-sm font-medium">Upload history</span>
-                )}
-              </button>
-
-              <button
-                onClick={() => setActiveTab("new")}
-                className={`v2-sidebar-nav ${activeTab === "new" ? "v2-sidebar-nav-active" : ""}`}
-                title="New upload"
-              >
-                <Upload className="h-5 w-5 flex-shrink-0" />
-                {!isSidebarCollapsed && (
-                  <span className="text-sm font-medium">New upload</span>
-                )}
-              </button>
-
-              <button
-                onClick={() => setActiveTab("recommendations")}
-                className={`v2-sidebar-nav ${activeTab === "recommendations" ? "v2-sidebar-nav-active" : ""}`}
-                title="Your recommendations"
-              >
-                <Sparkles className="h-5 w-5 flex-shrink-0" />
-                {!isSidebarCollapsed && (
-                  <span className="text-sm font-medium">Recommendations</span>
-                )}
-              </button>
-
-              <button
-                onClick={() => setActiveTab("notifications")}
-                className={`v2-sidebar-nav ${activeTab === "notifications" ? "v2-sidebar-nav-active" : ""}`}
-                title="Notifications"
-              >
-                <Bell className="h-5 w-5 flex-shrink-0" />
-                {!isSidebarCollapsed && (
-                  <span className="text-sm font-medium">Notifications</span>
-                )}
-              </button>
+            <nav className="flex-1 space-y-2" role="tablist" aria-label="Dashboard sections">
+              {sidebarTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`v2-sidebar-nav ${activeTab === tab.id ? "v2-sidebar-nav-active" : ""}`}
+                  title={TAB_META[tab.id].title}
+                >
+                  {tab.icon}
+                  {!isSidebarCollapsed && (
+                    <span className="text-sm font-medium">{TAB_META[tab.id].title}</span>
+                  )}
+                </button>
+              ))}
             </nav>
-            {!isSidebarCollapsed && (
-              <div className="v2-quota-card mt-4 p-3 space-y-2">
+            {!isSidebarCollapsed ? (
+              <div className="v2-quota-card mt-4 p-3 space-y-3">
                 <div className="text-[11px] uppercase tracking-wide v2-text-muted">Daily quota</div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="v2-text-muted">Uploads</span>
-                  <span className="font-medium">
-                    {isQuotaLoading ? "..." : `${quota?.uploads_used ?? 0}/${quota?.uploads_limit ?? 3}`}
-                  </span>
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="v2-text-muted">Uploads</span>
+                    <span className="font-medium">
+                      {isQuotaLoading ? "..." : `${quota?.uploads_used ?? 0}/${quota?.uploads_limit ?? 3}`}
+                    </span>
+                  </div>
+                  <div className="v2-quota-bar">
+                    <div
+                      className={quotaBarClass(quota?.uploads_used ?? 0, quota?.uploads_limit ?? 3)}
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          Math.round((((quota?.uploads_used ?? 0) / Math.max(1, quota?.uploads_limit ?? 3)) * 100))
+                        )}%`,
+                        height: "100%",
+                        borderRadius: "9999px",
+                        transition: "width 0.3s ease",
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="v2-quota-bar">
-                  <div
-                    className="v2-quota-fill"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        Math.round((((quota?.uploads_used ?? 0) / Math.max(1, quota?.uploads_limit ?? 3)) * 100))
-                      )}%`,
-                    }}
-                  />
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="v2-text-muted">Recommendations</span>
+                    <span className="font-medium">
+                      {isQuotaLoading ? "..." : `${quota?.coach_used ?? 0}/${quota?.coach_limit ?? 5}`}
+                    </span>
+                  </div>
+                  <div className="v2-quota-bar">
+                    <div
+                      className={quotaBarClass(quota?.coach_used ?? 0, quota?.coach_limit ?? 5)}
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          Math.round((((quota?.coach_used ?? 0) / Math.max(1, quota?.coach_limit ?? 5)) * 100))
+                        )}%`,
+                        height: "100%",
+                        borderRadius: "9999px",
+                        transition: "width 0.3s ease",
+                      }}
+                    />
+                  </div>
                 </div>
+              </div>
+            ) : (
+              <div
+                className="v2-quota-card mt-4 p-2 text-center text-[10px] v2-text-muted leading-tight"
+                title={`Uploads ${quota?.uploads_used ?? 0}/${quota?.uploads_limit ?? 3} · Recommendations ${quota?.coach_used ?? 0}/${quota?.coach_limit ?? 5}`}
+              >
+                {isQuotaLoading ? "…" : `${quota?.uploads_used ?? 0}/${quota?.uploads_limit ?? 3}`}
               </div>
             )}
           </div>
@@ -776,35 +905,66 @@ export default function DashboardPage() {
             isSidebarCollapsed ? "ml-20" : "ml-64"
           }`}
         >
-          <div className="pt-6 pb-6 px-6 lg:px-8 xl:px-10">
-            <header className="mb-4 max-w-4xl mx-auto">
+          <div className="pt-6 pb-6 px-4 sm:px-6 lg:px-8 xl:px-10">
+            <header className="mb-8 max-w-4xl mx-auto">
               <h1 className="text-xl md:text-2xl font-semibold tracking-tight mb-1">
-                Manage your workspace
+                {TAB_META[activeTab].title}
               </h1>
-              <p className="text-xs v2-text-muted max-w-2xl">
-                A single place to upload resumes, track processing, review recommendations, and stay on top of notifications.
+              <p className="text-xs sm:text-sm v2-text-muted max-w-2xl">
+                {TAB_META[activeTab].description}
               </p>
             </header>
 
-            <div className="max-w-4xl mx-auto">
+            {focusedUploadId && (
+              <div className="v2-active-banner max-w-4xl mx-auto mb-6">
+                <div className="v2-sunken h-10 w-10 rounded-full flex items-center justify-center shrink-0">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] uppercase tracking-wide v2-text-muted">Active resume</p>
+                  <p className="text-sm font-medium truncate">
+                    {focusedUpload?.file_name || `Upload ${focusedUploadId.slice(0, 8)}`}
+                  </p>
+                </div>
+                {focusedStatusCfg && (
+                  <span className={`inline-flex items-center gap-1.5 shrink-0 ${focusedStatusCfg.className}`}>
+                    {focusedStatusCfg.icon}
+                    <span>{focusedStatusCfg.label}</span>
+                  </span>
+                )}
+                <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("notifications")}
+                    className="v2-btn-outline px-3 py-1.5 text-xs"
+                  >
+                    Activity
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDetailUploadId(focusedUploadId)}
+                    className="v2-btn-outline px-3 py-1.5 text-xs inline-flex items-center gap-1"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    View
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearFocusedUpload}
+                    className="v2-text-muted hover:opacity-80 p-1.5"
+                    aria-label="Clear selection"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="max-w-4xl mx-auto mt-2">
               <div className="v2-neumorphic-card p-4 sm:p-6 md:p-8">
               {activeTab === "history" && (
                 <>
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h2 className="text-xl sm:text-2xl font-semibold mb-2">
-                        Upload history
-                      </h2>
-                      <p className="text-sm sm:text-base v2-text-muted">
-                        Recent resumes you have analyzed with Jobgenie.
-                      </p>
-                    </div>
-                    <button className="text-sm v2-text-muted hover:v2-link-accent transition-colors">
-                      View all
-                    </button>
-                  </div>
-
-                  <div className="border-t border-[hsl(var(--border))] mt-6 pt-6 space-y-3">
+                  <div className="space-y-3">
                     {isHistoryLoading && <UploadHistorySkeleton rows={5} />}
 
                     {!isHistoryLoading && paginatedUploads.map((upload) => {
@@ -813,30 +973,47 @@ export default function DashboardPage() {
                         isFocused && focusedStatus ? focusedStatus : upload.status;
                       const cfg =
                         statusConfig[effectiveStatus] || statusConfig.parsing;
+                      const rowIcon = READY_STATUSES.has(effectiveStatus) ? (
+                        <FileText className="h-5 w-5" />
+                      ) : (
+                        <Upload className="h-5 w-5" />
+                      );
                       return (
                         <div
                           key={upload.upload_id}
-                          className={`flex items-center justify-between gap-4 rounded-2xl px-5 py-4 hover:bg-[hsl(var(--muted)/0.5)] transition-colors ${
-                            isFocused ? "border border-[hsl(var(--foreground)/0.15)] v2-row-focused" : ""
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => focusUpload(upload.upload_id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              focusUpload(upload.upload_id);
+                            }
+                          }}
+                          className={`v2-list-row flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 px-4 sm:px-5 py-4 cursor-pointer ${
+                            isFocused ? "v2-row-focused" : ""
                           }`}
                         >
-                          <div className="flex items-center gap-4 min-w-0 flex-1">
+                          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
                             <div className="h-10 w-10 rounded-full v2-sunken flex items-center justify-center flex-shrink-0">
-                              <Upload className="h-5 w-5 v2-link-accent" />
+                              {rowIcon}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="text-base font-medium truncate">
+                              <p className="text-sm sm:text-base font-medium truncate">
                                 {upload.file_name}
                               </p>
-                              <p className="text-sm v2-text-muted">
-                                Uploaded {(upload.created_at || "").slice(0, 10)}
+                              <p className="text-xs sm:text-sm v2-text-muted">
+                                {formatUploadDate(upload.created_at)}
                               </p>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-3 flex-shrink-0">
+                          <div
+                            className="flex items-center gap-2 sm:gap-3 flex-shrink-0 pl-[3.25rem] sm:pl-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <span
-                              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${cfg.className}`}
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-medium ${cfg.className}`}
                             >
                               {cfg.icon}
                               <span>{cfg.label}</span>
@@ -844,27 +1021,28 @@ export default function DashboardPage() {
                             {(effectiveStatus === "embedding_completed" || effectiveStatus === "failed") && (
                               <button
                                 type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  startRecommendationsForUpload(upload.upload_id);
-                                }}
+                                onClick={() => startRecommendationsForUpload(upload.upload_id)}
                                 disabled={startingRecFor === upload.upload_id}
-                                className="inline-flex items-center justify-center text-xs font-semibold px-2.5 py-1.5 rounded-lg v2-btn-primary hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap shrink-0 w-auto max-w-[9.5rem]"
+                                className="inline-flex items-center justify-center text-[11px] sm:text-xs font-semibold px-2.5 py-1.5 rounded-lg v2-btn-primary hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap shrink-0"
                               >
-                                {startingRecFor === upload.upload_id ? "Starting…" : "Create recommendations"}
+                                {startingRecFor === upload.upload_id ? "Starting…" : "Create matches"}
                               </button>
                             )}
                             <button
+                              type="button"
                               onClick={() => setDetailUploadId(upload.upload_id)}
-                              className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full border border-[hsl(var(--border))] v2-text-muted v2-btn-outline hover:bg-[hsl(var(--muted))] transition-colors"
+                              className="inline-flex items-center justify-center p-2 rounded-full v2-btn-outline"
+                              aria-label="View parsed resume"
+                              title="View parsed resume"
                             >
-                              View
-                              <ArrowUpRight className="h-4 w-4" />
+                              <Eye className="h-4 w-4" />
                             </button>
                             <button
+                              type="button"
                               onClick={() => setDeleteConfirmUploadId(upload.upload_id)}
                               disabled={isDeleting}
                               className="inline-flex items-center justify-center p-2 rounded-full v2-btn-danger-outline hover:bg-[hsl(0_35%_15%)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              aria-label="Delete upload"
                               title="Delete upload"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -875,8 +1053,16 @@ export default function DashboardPage() {
                     })}
 
                     {!isHistoryLoading && uploadsToShow.length === 0 && (
-                      <div className="py-10 text-center text-sm v2-text-muted">
-                        No uploads yet. Start by uploading your first resume.
+                      <div className="py-12 text-center flex flex-col items-center gap-4">
+                        <Upload className="h-8 w-8 v2-text-muted" />
+                        <p className="text-sm v2-text-muted">No uploads yet.</p>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab("new")}
+                          className="v2-btn-primary px-5 py-2.5 text-sm rounded-lg"
+                        >
+                          Upload your first resume
+                        </button>
                       </div>
                     )}
 
@@ -969,18 +1155,15 @@ export default function DashboardPage() {
                   setActiveTab={setActiveTab}
                   refetchHistory={refetchHistory}
                   onDuplicateFileReuse={handleDuplicateFileReuse}
+                  onValidationError={pushValidationError}
                 />
               )}
 
               {activeTab === "recommendations" && (
                 <div className="min-h-[500px]">
-                  <h2 className="text-xl sm:text-2xl font-semibold mb-3">
-                    Your recommendations
-                  </h2>
-
                   {focusedStatus === "embedding" && (
                     <div className="rounded-2xl border border-[hsl(var(--border))] v2-alert px-5 py-4 mb-6 flex items-start gap-3">
-                      <Sparkles className="h-5 w-5 v2-text-muted mt-0.5" />
+                      <Briefcase className="h-5 w-5 v2-text-muted mt-0.5" />
                       <div>
                         <p className="text-sm font-medium">Creating resume embeddings…</p>
                         <p className="text-xs v2-text-muted mt-1">
@@ -1012,7 +1195,7 @@ export default function DashboardPage() {
                   )}
                   {focusedStatus === "recommendations" && (
                     <div className="rounded-2xl border border-[hsl(var(--border))] v2-alert px-5 py-4 mb-6 flex items-start gap-3">
-                      <Sparkles className="h-5 w-5 v2-text-muted mt-0.5" />
+                      <Briefcase className="h-5 w-5 v2-text-muted mt-0.5" />
                       <div>
                         <p className="text-sm font-medium">Generating recommendations…</p>
                         <p className="text-xs v2-text-muted mt-1">
@@ -1043,11 +1226,18 @@ export default function DashboardPage() {
                     </div>
                   ) : recommendationHistoryItems.length === 0 ? (
                     <div className="rounded-2xl v2-empty-state p-10 flex flex-col items-center justify-center gap-4 min-h-[300px]">
-                      <Sparkles className="h-6 w-6 v2-text-muted" />
-                      <p className="text-sm ">No saved recommendations yet.</p>
+                      <Briefcase className="h-6 w-6 v2-text-muted" />
+                      <p className="text-sm">No saved recommendations yet.</p>
                       <p className="text-xs v2-text-muted text-center max-w-md">
                         Upload and process a resume to generate your first personalized recommendation set.
                       </p>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("new")}
+                        className="v2-btn-primary px-5 py-2.5 text-sm rounded-lg"
+                      >
+                        Upload resume
+                      </button>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -1063,7 +1253,7 @@ export default function DashboardPage() {
                         return (
                           <div
                             key={item._id}
-                            className="w-full text-left rounded-2xl v2-empty-state hover:bg-[hsl(var(--muted)/0.5)] transition-colors p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+                            className="w-full text-left rounded-2xl v2-list-row hover:bg-[hsl(var(--muted)/0.5)] transition-colors p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
                           >
                             <div className="min-w-0">
                               <p className="text-base font-medium truncate">
@@ -1114,7 +1304,12 @@ export default function DashboardPage() {
               )}
 
               {activeTab === "notifications" && (
-                <ActivityTimelineTab focusedUploadId={focusedUploadId} />
+                <ActivityTimelineTab
+                  focusedUploadId={focusedUploadId}
+                  historyItems={historyItems}
+                  onSelectUpload={focusUpload}
+                  onGoToUpload={() => setActiveTab("new")}
+                />
               )}
               </div>
             </div>
@@ -1124,7 +1319,7 @@ export default function DashboardPage() {
 
       {showRecProgressModal && focusedStatus === "recommendations" && focusedUploadId && !minimizeRecProgress && (
         <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center p-4">
-          <div className="absolute inset-0 v2-modal-backdrop" onClick={() => setMinimizeRecProgress(true)} />
+          <div className="absolute inset-0 v2-modal-backdrop" />
           <div className="relative z-10 w-full max-w-md v2-modal-panel p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
