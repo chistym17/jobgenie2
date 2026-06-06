@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Lock, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import V2Toaster from "../V2Toaster";
-import AuthShell from "./AuthShell";
+import AuthShell, { AuthDivider } from "./AuthShell";
 import AuthInput from "./AuthInput";
 import PrimaryButton from "./PrimaryButton";
 import DemoBanner from "./DemoBanner";
@@ -78,27 +78,17 @@ export default function LoginForm() {
   const signupHref = nextPath ? `/signup?next=${encodeURIComponent(nextPath)}` : "/signup";
 
   return (
-    <AuthShell title="Welcome back" subtitle="Log in to continue your Jobgenie journey">
+    <AuthShell title="Welcome back" subtitle="Sign in to view your matches and match coach">
       <V2Toaster />
       <GoogleSignInButton redirectPath={nextPath} className="v2-google-btn" />
-      <div className="relative py-2">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full v2-auth-divider" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="px-2 v2-text-muted" style={{ background: "hsl(var(--card))" }}>
-            or
-          </span>
-        </div>
-      </div>
-      <DemoBanner loading={demoLoading} onClick={handleDemoLogin} />
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <AuthDivider label="or continue with email" />
+      <form onSubmit={handleSubmit} className="space-y-4">
         <AuthInput
           id="email"
           name="email"
           type="email"
           required
-          label="Email Address"
+          label="Email"
           placeholder="you@example.com"
           value={form.email}
           onChange={handleChange}
@@ -117,18 +107,20 @@ export default function LoginForm() {
           icon={Lock}
           autoComplete="current-password"
         />
-        <div className="flex items-center justify-between text-sm v2-text-muted">
-          <label className="inline-flex items-center gap-2">
+        <div className="flex items-center justify-between gap-3 text-sm v2-text-muted">
+          <label className="inline-flex items-center gap-2 cursor-pointer">
             <input type="checkbox" className="v2-auth-checkbox h-4 w-4 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
             Remember me
           </label>
-          <Link href="/forgot-password" className="v2-link-accent">
+          <Link href="/forgot-password" className="v2-link-accent shrink-0">
             Forgot password?
           </Link>
         </div>
-        <PrimaryButton type="submit" text="Log In" icon={<LogIn className="h-5 w-5" />} loading={loading} />
+        <PrimaryButton type="submit" text="Log in" icon={<LogIn className="h-5 w-5" />} loading={loading} />
       </form>
-      <div className="text-center pt-4 text-sm v2-text-muted">
+      <AuthDivider label="or explore first" />
+      <DemoBanner loading={demoLoading} onClick={handleDemoLogin} />
+      <div className="v2-auth-footer">
         Don&apos;t have an account?{" "}
         <Link href={signupHref} className="v2-link-accent">
           Sign up

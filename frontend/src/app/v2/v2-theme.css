@@ -181,6 +181,210 @@
   border-top: 1px solid hsl(var(--border));
 }
 
+.v2-shell .v2-auth-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.v2-shell .v2-auth-topnav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1.5rem;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--background) / 0.95);
+  backdrop-filter: blur(8px);
+}
+
+.v2-shell .v2-auth-topnav-logo {
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: hsl(var(--foreground));
+  transition: opacity 0.2s ease;
+}
+
+.v2-shell .v2-auth-topnav-logo:hover {
+  opacity: 0.8;
+}
+
+.v2-shell .v2-auth-topnav-link {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  transition: color 0.2s ease;
+}
+
+.v2-shell .v2-auth-topnav-link:hover {
+  color: hsl(var(--foreground));
+}
+
+.v2-shell .v2-auth-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.v2-shell .v2-auth-brand {
+  display: none;
+}
+
+.v2-shell .v2-auth-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+}
+
+.v2-shell .v2-auth-form-wrap {
+  width: 100%;
+  max-width: 26rem;
+}
+
+.v2-shell .v2-auth-form-header {
+  margin-bottom: 1.5rem;
+}
+
+.v2-shell .v2-auth-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.v2-shell .v2-auth-subtitle {
+  margin-top: 0.375rem;
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+  line-height: 1.5;
+}
+
+.v2-shell .v2-auth-or {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.v2-shell .v2-auth-or::before,
+.v2-shell .v2-auth-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: hsl(var(--border));
+}
+
+.v2-shell .v2-auth-demo {
+  margin-bottom: 1.25rem;
+  padding: 0.875rem;
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--surface-sunken));
+}
+
+.v2-shell .v2-auth-demo-hint {
+  margin-top: 0.625rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem 0.5rem;
+  font-size: 0.6875rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.v2-shell .v2-auth-demo-hint code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.6875rem;
+}
+
+.v2-shell .v2-auth-footer {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid hsl(var(--border));
+  text-align: center;
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+}
+
+@media (min-width: 1024px) {
+  .v2-shell .v2-auth-layout {
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  }
+
+  .v2-shell .v2-auth-main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 3.5rem;
+    border-right: 1px solid hsl(var(--border));
+  }
+
+  .v2-shell .v2-auth-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 3.5rem;
+    background:
+      radial-gradient(ellipse 60% 50% at 80% 20%, hsl(var(--muted) / 0.35), transparent 55%),
+      hsl(var(--background));
+  }
+
+  .v2-shell .v2-auth-brand-inner {
+    width: 100%;
+    max-width: 24rem;
+  }
+
+  .v2-shell .v2-auth-logo {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: hsl(var(--foreground));
+    transition: opacity 0.2s ease;
+  }
+
+  .v2-shell .v2-auth-logo:hover {
+    opacity: 0.8;
+  }
+
+  .v2-shell .v2-auth-eyebrow {
+    margin-top: 2.5rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .v2-shell .v2-auth-headline {
+    margin-top: 0.875rem;
+    font-size: clamp(2rem, 3.5vw, 2.75rem);
+    font-weight: 700;
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+  }
+
+  .v2-shell .v2-auth-form-wrap {
+    max-width: 24rem;
+  }
+
+  .v2-shell .v2-auth-title {
+    font-size: 1.75rem;
+  }
+}
+
 .v2-shell .v2-link-accent {
   color: hsl(var(--foreground));
   font-weight: 600;

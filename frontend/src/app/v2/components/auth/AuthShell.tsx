@@ -7,20 +7,50 @@ interface AuthShellProps {
   children: React.ReactNode;
 }
 
+export function AuthDivider({ label = "or" }: { label?: string }) {
+  return (
+    <div className="v2-auth-or" aria-hidden>
+      <span>{label}</span>
+    </div>
+  );
+}
+
 const AuthShell = ({ title, subtitle, children }: AuthShellProps) => {
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md">
-        <div className="v2-neumorphic-card p-8 md:p-10">
-          <div className="text-center mb-8">
-            <Link href="/" className="v2-badge inline-flex uppercase tracking-wide font-semibold">
-              Jobgenie
-            </Link>
-            <h1 className="text-2xl md:text-3xl font-bold mt-4">{title}</h1>
-            {subtitle ? <p className="v2-text-muted mt-2 text-sm md:text-base">{subtitle}</p> : null}
+    <div className="v2-auth-page">
+      <header className="v2-auth-topnav">
+        <Link href="/" className="v2-auth-topnav-logo">
+          JOBGENIE
+        </Link>
+        <Link href="/" className="v2-auth-topnav-link">
+          Home
+        </Link>
+      </header>
+
+      <div className="v2-auth-layout">
+        <main className="v2-auth-main">
+          <div className="v2-auth-form-wrap">
+            <div className="v2-auth-form-header">
+              <h1 className="v2-auth-title">{title}</h1>
+              {subtitle ? <p className="v2-auth-subtitle">{subtitle}</p> : null}
+            </div>
+            {children}
           </div>
-          {children}
-        </div>
+        </main>
+
+        <aside className="v2-auth-brand">
+          <div className="v2-auth-brand-inner">
+            <Link href="/" className="v2-auth-logo">
+              JOBGENIE
+            </Link>
+            <p className="v2-auth-eyebrow">AI-powered job matching</p>
+            <h2 className="v2-auth-headline">
+              Stop searching.
+              <br />
+              <span className="v2-text-gradient">Start matching.</span>
+            </h2>
+          </div>
+        </aside>
       </div>
     </div>
   );

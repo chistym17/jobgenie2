@@ -8,7 +8,7 @@ import "../v2/v2-theme.css";
 
 function LoginFallback() {
   return (
-    <AuthShell title="Welcome back" subtitle="Log in to continue your Jobgenie journey">
+    <AuthShell title="Welcome back" subtitle="Sign in to view your matches and match coach">
       <div className="flex justify-center py-12 v2-text-muted">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
