@@ -14,21 +14,21 @@ interface Job {
 }
 
 const JobCard = ({ job }: { job: Job }) => (
-  <div className="dbms-flat-card p-5 hover:border-[hsl(var(--foreground)/0.2)] transition-colors h-full flex flex-col">
+  <div className="v2-flat-card p-5 hover:border-[hsl(var(--foreground)/0.2)] transition-colors h-full flex flex-col">
     <div className="flex justify-between items-start gap-3 mb-3">
       <div className="min-w-0">
         <h3 className="text-base font-medium mb-1 truncate" title={job.title}>
           {job.title}
         </h3>
-        <p className="dbms-text-muted text-sm truncate" title={job.company}>
+        <p className="v2-text-muted text-sm truncate" title={job.company}>
           {job.company}
         </p>
       </div>
-      {job.source ? <span className="dbms-badge shrink-0">{job.source}</span> : null}
+      {job.source ? <span className="v2-badge shrink-0">{job.source}</span> : null}
     </div>
-    {job.date ? <p className="text-xs dbms-text-muted mb-4">Posted {job.date}</p> : <div className="mb-4" />}
+    {job.date ? <p className="text-xs v2-text-muted mb-4">Posted {job.date}</p> : <div className="mb-4" />}
     <div className="mt-auto flex items-center justify-between pt-2">
-      <div className="text-sm dbms-text-muted">{job.date ? `Posted ${job.date}` : ""}</div>
+      <div className="text-sm v2-text-muted">{job.date ? `Posted ${job.date}` : ""}</div>
       {job.url ? (
         <a
           href={job.url}
@@ -56,9 +56,8 @@ const RecentMatches = () => {
         if (!res.ok) throw new Error("Failed to fetch jobs");
         const data = await res.json();
         setJobs(data || []);
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : "Failed to load jobs";
-        setError(message);
+      } catch (err: any) {
+        setError(err.message || "Failed to load jobs");
       } finally {
         setLoading(false);
       }
@@ -69,15 +68,12 @@ const RecentMatches = () => {
   const visible = jobs.slice(0, 9);
 
   return (
-    <section
-      className="py-16 px-6 border-t"
-      style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--card))" }}
-    >
+    <section className="v2-section-alt py-16 px-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
           <div>
             <h2 className="text-2xl md:text-3xl font-bold mb-2">Live Opportunities</h2>
-            <p className="dbms-text-muted text-sm">Based on the latest curated feed.</p>
+            <p className="v2-text-muted text-sm">Based on the latest curated feed.</p>
           </div>
           <Link
             href="/explore-jobs"
@@ -92,15 +88,13 @@ const RecentMatches = () => {
             {[...Array(3)].map((_, i) => (
               <div
                 key={i}
-                className="dbms-flat-card p-5 animate-pulse h-36"
+                className="v2-flat-card p-5 animate-pulse h-36"
                 style={{ background: "hsl(var(--muted))" }}
               />
             ))}
           </div>
         ) : error ? (
-          <div className="text-sm" style={{ color: "hsl(0 70% 60%)" }}>
-            {error}
-          </div>
+          <div className="v2-error text-sm">{error}</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {visible.map((job, idx) => (
