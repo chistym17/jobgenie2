@@ -125,3 +125,69 @@
 .v2-shell .v2-error {
   color: hsl(0 70% 60%);
 }
+
+.v2-shell .v2-auth-input {
+  width: 100%;
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--surface-sunken));
+  box-shadow: var(--shadow-neumorphic-inset);
+  color: hsl(var(--foreground));
+  padding: 0.75rem 0.75rem 0.75rem 2.5rem;
+  font-size: 0.875rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.v2-shell .v2-auth-input::placeholder {
+  color: hsl(var(--muted-foreground) / 0.7);
+}
+
+.v2-shell .v2-auth-input:focus {
+  outline: none;
+  border-color: hsl(var(--primary) / 0.5);
+  box-shadow: var(--shadow-neumorphic-inset), 0 0 0 2px hsl(var(--primary) / 0.25);
+}
+
+.v2-shell .v2-auth-checkbox {
+  accent-color: hsl(var(--foreground));
+}
+
+.v2-shell .v2-google-btn {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--secondary));
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+  transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+.v2-shell .v2-google-btn:hover:not(:disabled) {
+  background: hsl(var(--muted));
+}
+
+.v2-shell .v2-google-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.v2-shell .v2-auth-divider {
+  border-top: 1px solid hsl(var(--border));
+}
+
+.v2-shell .v2-link-accent {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.v2-shell .v2-link-accent:hover {
+  opacity: 0.85;
+}

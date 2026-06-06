@@ -1,10 +1,11 @@
 "use client";
 
 import { useSignIn } from "@clerk/nextjs";
-import { Loader2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef } from "react";
 import { safeRedirectPath } from "../../utils/auth";
+import AuthLoadingScreen from "../../v2/components/auth/AuthLoadingScreen";
+import "../../v2/v2-theme.css";
 
 function GoogleRedirect() {
   const { signIn, fetchStatus } = useSignIn();
@@ -22,22 +23,12 @@ function GoogleRedirect() {
     });
   }, [signIn, fetchStatus, redirectUrl]);
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0f] text-[#E2E4E9]">
-      <Loader2 className="h-8 w-8 animate-spin" aria-hidden />
-    </div>
-  );
+  return <AuthLoadingScreen />;
 }
 
 export default function SignUpPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#0a0a0f] text-[#E2E4E9]">
-          <Loader2 className="h-8 w-8 animate-spin" aria-hidden />
-        </div>
-      }
-    >
+    <Suspense fallback={<AuthLoadingScreen />}>
       <GoogleRedirect />
     </Suspense>
   );
