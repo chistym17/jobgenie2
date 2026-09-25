@@ -19,7 +19,7 @@ image = (
     .pip_install(
         "python-dotenv",
         "pymongo",
-        "qdrant-client",
+        "qdrant-client>=1.12.0,<2",
         "openai",
         "numpy",
         "cohere",
