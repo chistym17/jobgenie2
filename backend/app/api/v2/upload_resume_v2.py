@@ -5,7 +5,7 @@ import hashlib
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 
-from app.config.v2 import celery_client
+from app.config.v2.task_dispatcher import enqueue_parse_resume
 from app.models.v2.upload_models import UploadResumeResponse
 from app.models.v2.upload_db_models import UploadStatus
 from app.services.v2.file_storage_service import FileStorageService
@@ -90,17 +90,14 @@ async def upload_resume_v2(
         logger.error("create_upload returned empty upload_id for user=%s file_id=%s", user_email, file_id)
         raise HTTPException(status_code=500, detail="Failed to create upload record")
 
-    # enqueue parse_resume_v2 task in worker
-    task = celery_client.send_task(
-        "parse_resume_v2",
-        args=[upload_id, file_id, user_email],
-    )
-    logger.info("Enqueued parse_resume_v2 task: task_id=%s for upload_id=%s", task.id, upload_id)
+    # enqueue parse_resume_v2 (Celery local / Modal prod)
+    task_id = enqueue_parse_resume(upload_id, file_id, user_email)
+    logger.info("Enqueued parse_resume_v2 task: task_id=%s for upload_id=%s", task_id, upload_id)
 
     await resume_upload_service.update_status(
         upload_id,
         UploadStatus.PENDING,
-        parse_task_id=task.id,
+        parse_task_id=task_id,
     )
     await resume_upload_service.add_activity_event(
         upload_id,
@@ -111,7 +108,7 @@ async def upload_resume_v2(
 
     response = UploadResumeResponse(
         upload_id=upload_id,
-        parse_task_id=task.id,
+        parse_task_id=task_id,
         status="queued",
         message="Resume upload queued for processing",
     )

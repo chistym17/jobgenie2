@@ -35,3 +35,4 @@ PyPDF2
 celery
 redis
 qdrant-client
+modal

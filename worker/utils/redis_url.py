@@ -19,7 +19,12 @@ def resolve_redis_url() -> str:
     Pick Redis URL from APP_ENV:
       - local (default): CELERY_BROKER_URL / REDIS_URL / localhost
       - prod|production: UPSTASH_REDIS_URL (or CELERY_BROKER_URL / REDIS_URL)
+      - JOB_RUNNER=modal: dummy URL (Celery broker unused; tasks run via .run())
     """
+    # Modal executes task bodies in-process; no Redis broker needed.
+    if (os.getenv("JOB_RUNNER") or "").strip().lower() == "modal":
+        return "redis://127.0.0.1:6379/15"
+
     app_env = (os.getenv("APP_ENV") or os.getenv("ENVIRONMENT") or "local").strip().lower()
     local_default = "redis://localhost:6379/0"
 

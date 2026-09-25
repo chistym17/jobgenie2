@@ -1,3 +1,3 @@
-from .recommendation_task import generate_recommendations_task
-from .precompute_embedding import precompute_resume_embedding_task
-__all__ = ['generate_recommendations_task', 'precompute_resume_embedding_task'] 
+# Keep package import light so Modal can load one task module without
+# pulling every task (and without forcing Celery Redis setup).
+__all__: list[str] = []

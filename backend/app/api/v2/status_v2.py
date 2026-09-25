@@ -4,7 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.config.v2 import celery_client
+from app.config.v2.task_dispatcher import enqueue_generate_recommendations, enqueue_parse_resume
 from app.models.v2.upload_db_models import UploadStatus
 from app.models.v2.upload_models import (
     UploadStatusResponse,
@@ -120,15 +120,20 @@ async def start_recommendations(
             detail="Daily recommendation quota exceeded. Try again tomorrow.",
         )
 
-    async_result = celery_client.send_task(
-        "generate_recommendations",
-        args=[user_email, upload_id],
-    )
+    task_id = enqueue_generate_recommendations(user_email, upload_id)
     claimed = await resume_upload_service.claim_recommendations_start(
-        upload_id, user_email, async_result.id
+        upload_id, user_email, task_id
     )
     if not claimed:
-        async_result.revoke(terminate=True)
+        # Best-effort cancel only applies to Celery; Modal calls are fire-and-forget
+        try:
+            from app.config.v2.task_dispatcher import job_runner
+            from app.config.v2.celery_client import celery_client
+
+            if job_runner() != "modal":
+                celery_client.AsyncResult(task_id).revoke(terminate=True)
+        except Exception:
+            pass
         doc2 = await resume_upload_service.get_upload(upload_id)
         if doc2 and doc2.get("status") == UploadStatus.COMPLETED:
             return StartRecommendationsResponse(
@@ -157,13 +162,13 @@ async def start_recommendations(
         "Started recommendations upload_id=%s user_email=%s task_id=%s",
         upload_id,
         user_email,
-        async_result.id,
+        task_id,
     )
 
     return StartRecommendationsResponse(
         upload_id=upload_id,
         status="recommendations",
-        task_id=async_result.id,
+        task_id=task_id,
         message="Recommendation generation started.",
     )
 
@@ -192,15 +197,12 @@ async def retry_upload(upload_id: str):
 
     logger.info("Retrying upload_id=%s with status=%s, new_retry_count=%s", upload_id, status, new_retry_count)
 
-    task = celery_client.send_task(
-        "parse_resume_v2",
-        args=[upload_id, file_id, user_email],
-    )
+    task_id = enqueue_parse_resume(upload_id, file_id, user_email)
 
     await resume_upload_service.update_status(
         upload_id,
         UploadStatus.PENDING,
-        parse_task_id=task.id,
+        parse_task_id=task_id,
         retry_count=new_retry_count,
         error_message=None,
     )
