@@ -6,10 +6,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, User, Lock, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import V2Toaster from "../V2Toaster";
-import AuthShell, { AuthDivider } from "./AuthShell";
+import AuthShell from "./AuthShell";
 import AuthInput from "./AuthInput";
 import PrimaryButton from "./PrimaryButton";
-import GoogleSignInButton from "../../../components/GoogleSignInButton";
 import { safeRedirectPath } from "../../../utils/auth";
 
 export default function SignupForm() {
@@ -56,8 +55,6 @@ export default function SignupForm() {
   return (
     <AuthShell title="Create your account" subtitle="Get curated job matches tailored to your resume">
       <V2Toaster />
-      <GoogleSignInButton redirectPath={nextPath} className="v2-google-btn" />
-      <AuthDivider label="or sign up with email" />
       <form onSubmit={handleSubmit} className="space-y-4">
         <AuthInput
           id="name"

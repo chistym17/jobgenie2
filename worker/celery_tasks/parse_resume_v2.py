@@ -77,60 +77,124 @@ def _read_pdf_from_gridfs(bucket: GridFSBucket, file_id: str) -> str:
   return text
 
 
-def _call_gemini(file_text: str) -> dict:
+def _extract_json_text(response_text: str) -> str:
+  text = (response_text or "").strip()
+  if not text:
+    return ""
+  match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
+  if match:
+    return match.group(1).strip()
+  # Prefer the outermost object if the model added prose
+  start = text.find("{")
+  end = text.rfind("}")
+  if start != -1 and end != -1 and end > start:
+    return text[start : end + 1].strip()
+  return text
+
+
+def _parse_resume_json(raw: str) -> dict:
+  """Parse model JSON without the destructive global quote swap."""
+  json_str = _extract_json_text(raw)
+  if not json_str:
+    raise ValueError("Empty model response for resume parse")
+
+  candidates = [json_str]
+  # Light cleanup only (no blanket ' → " which breaks apostrophes)
+  light = (
+    json_str.replace("None", "null")
+    .replace("True", "true")
+    .replace("False", "false")
+  )
+  light = re.sub(r",\s*}", "}", light)
+  light = re.sub(r",\s*]", "]", light)
+  if light != json_str:
+    candidates.append(light)
+
+  last_err: Exception | None = None
+  for candidate in candidates:
+    try:
+      data = json.loads(candidate)
+      if isinstance(data, dict):
+        return data
+      raise ValueError("Resume parse JSON root must be an object")
+    except Exception as exc:
+      last_err = exc
+
+  try:
+    import json_repair
+
+    repaired = json_repair.repair_json(json_str)
+    data = json.loads(repaired) if isinstance(repaired, str) else repaired
+    if isinstance(data, dict):
+      logger.warning("Recovered resume JSON via json_repair")
+      return data
+  except Exception:
+    pass
+
+  raise ValueError(f"Failed to parse resume JSON: {last_err}") from last_err
+
+
+def _call_groq_parser(file_text: str) -> dict:
   client = get_groq_client()
   model_name = os.getenv("GROQ_MODEL_NAME", "llama3-8b-8192")
+  try:
+    max_tokens = int(os.getenv("RESUME_PARSE_MAX_TOKENS", "4096"))
+  except Exception:
+    max_tokens = 4096
+  max_tokens = max(1024, min(8192, max_tokens))
 
-  prompt = f"""You are a professional resume parser. Please analyze the following resume text and extract the relevant information.
+  system = (
+    "You are a professional resume parser. "
+    "Return ONLY a single valid JSON object. "
+    "Use double quotes for all keys and string values. "
+    "Keep descriptions concise if needed so the JSON is complete."
+  )
+  user = f"""Analyze this resume and extract structured data.
 
 Resume Text:
 {file_text}
 
-Extract the following fields:
-- Full Name
-- Contact Information (Phone, Email, LinkedIn if available)
-- Skills (technical and soft)
-- Education (with degrees, institutes, years)
-- Work Experience (position, company, description, duration)
-- Projects (title, tech stack, description)
-- Certifications (if any)
-- Job Preferences (location, remote/on-site, role, etc.)
-
-Return ONLY valid JSON (no markdown, no explanation) in the following format:
+Required JSON shape:
 {{
-  'name': '',
-  'contact': {{
-     'email': '', 'phone': '', 'linkedin': ''
-  }},
-  'skills': [],
-  'education': [],
-  'experience': [],
-  'projects': [],
-  'certifications': [],
-  'preferences': {{}}
+  "name": "",
+  "contact": {{"email": "", "phone": "", "linkedin": ""}},
+  "skills": [],
+  "education": [],
+  "experience": [],
+  "projects": [],
+  "certifications": [],
+  "preferences": {{}}
 }}
 """
 
-  response = client.chat.completions.create(
-    model=model_name,
-    messages=[{"role": "user", "content": prompt}],
-    max_tokens=1200,
-    temperature=0.2,
-  )
+  create_kwargs = {
+    "model": model_name,
+    "messages": [
+      {"role": "system", "content": system},
+      {"role": "user", "content": user},
+    ],
+    "max_tokens": max_tokens,
+    "temperature": 0.1,
+  }
+  # Prefer Groq JSON mode when the model supports it
+  try:
+    response = client.chat.completions.create(
+      **create_kwargs,
+      response_format={"type": "json_object"},
+    )
+  except Exception as json_mode_err:
+    logger.warning("JSON mode unavailable (%s); retrying without it", json_mode_err)
+    response = client.chat.completions.create(**create_kwargs)
 
   response_text = (response.choices[0].message.content or "").strip()
-  match = re.search(r"```json(.*?)```", response_text, re.DOTALL | re.IGNORECASE)
-  json_str = match.group(1).strip() if match else response_text
+  finish = getattr(response.choices[0], "finish_reason", None)
+  if finish == "length":
+    logger.warning(
+      "Resume parse response truncated (finish_reason=length, max_tokens=%s)",
+      max_tokens,
+    )
 
-  cleaned_str = (
-    json_str
-    .replace("'", '"')
-    .replace("None", "null")
-    .replace("True", "true")
-    .replace("False", "false")
-  )
-
-  return json.loads(cleaned_str)
+  return _parse_resume_json(response_text)
 
 
 @celery_app.task(name="parse_resume_v2", bind=True, max_retries=3)
@@ -152,7 +216,7 @@ def parse_resume_v2(self, upload_id: str, file_id: str, user_email: str):
     file_text = _read_pdf_from_gridfs(bucket, file_id)
     file_text = _clean_resume_text(file_text)
 
-    resume_data = _call_gemini(file_text)
+    resume_data = _call_groq_parser(file_text)
 
     resume_doc = {
       "user_email": user_email,
