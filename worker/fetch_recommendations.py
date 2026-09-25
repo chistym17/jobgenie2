@@ -3,7 +3,7 @@ import os
 import re
 from db import fetch_resume_data
 from db import fetch_single_job_details
-from utils.embedder import get_embedding
+from utils.local_embedder import get_embedding
 from utils.qdrant_service import insert_resume_embedding
 from utils.qdrant_service import search_similar, get_resume_embedding_by_email
 from utils.hybrid_query import build_sparse_query

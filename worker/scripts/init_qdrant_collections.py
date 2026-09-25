@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Initialize Qdrant collections used by Job Genie:
   - job_embeddings (or QDRANT_COLLECTION)
@@ -5,17 +6,22 @@ Initialize Qdrant collections used by Job Genie:
 
 Both: vector size 384, Cosine distance.
 Safe to re-run: skips collections that already exist.
+
+  cd worker
+  python scripts/init_qdrant_collections.py
 """
 from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 
-load_dotenv()
+WORKER_ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(WORKER_ROOT / ".env")
 
 VECTOR_SIZE = 384
 

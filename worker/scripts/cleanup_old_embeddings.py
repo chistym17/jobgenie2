@@ -1,14 +1,24 @@
-import os
+#!/usr/bin/env python3
+"""
+Delete job embeddings older than DAYS_TO_KEEP from Qdrant.
+
+  cd worker
+  python scripts/cleanup_old_embeddings.py
+"""
+from __future__ import annotations
+
+import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from dotenv import load_dotenv
 from qdrant_client.http import models
 
+WORKER_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(WORKER_ROOT))
+load_dotenv(WORKER_ROOT / ".env")
+
 from utils.qdrant_service import client, COLLECTION_NAME
-
-
-load_dotenv()
-
 
 DAYS_TO_KEEP = 7
 BATCH_SIZE = 256
@@ -79,7 +89,3 @@ def cleanup_old_embeddings():
 
 if __name__ == "__main__":
     cleanup_old_embeddings()
-
-
-
-
