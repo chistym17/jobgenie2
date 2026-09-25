@@ -31,6 +31,47 @@ def fetch_all_jobs():
     
     return jobs
 
+
+def fetch_jobs_pending_ingest():
+    """Jobs not yet successfully written to Qdrant."""
+    client = get_mongodb_client()
+    try:
+        db = client["jobs_db"]
+        return list(
+            db["jobs"].find(
+                {
+                    "$or": [
+                        {"qdrant_ingested": {"$exists": False}},
+                        {"qdrant_ingested": False},
+                    ]
+                }
+            )
+        )
+    finally:
+        client.close()
+
+
+def mark_job_qdrant_ingested(job_id: str) -> None:
+    """Mark a job as successfully ingested into Qdrant."""
+    if not job_id:
+        return
+    client = get_mongodb_client()
+    try:
+        db = client["jobs_db"]
+        from datetime import datetime, timezone
+
+        db["jobs"].update_one(
+            {"id": job_id},
+            {
+                "$set": {
+                    "qdrant_ingested": True,
+                    "qdrant_ingested_at": datetime.now(timezone.utc).isoformat(),
+                }
+            },
+        )
+    finally:
+        client.close()
+
 def fetch_single_job_details(job_id:str):
     client=get_mongodb_client()
     db = client['jobs_db']
