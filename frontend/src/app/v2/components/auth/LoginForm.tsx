@@ -10,7 +10,6 @@ import AuthShell, { AuthDivider } from "./AuthShell";
 import AuthInput from "./AuthInput";
 import PrimaryButton from "./PrimaryButton";
 import DemoBanner from "./DemoBanner";
-import GoogleSignInButton from "../../../components/GoogleSignInButton";
 import { safeRedirectPath } from "../../../utils/auth";
 
 export default function LoginForm() {
@@ -80,8 +79,6 @@ export default function LoginForm() {
   return (
     <AuthShell title="Welcome back" subtitle="Sign in to view your matches and match coach">
       <V2Toaster />
-      <GoogleSignInButton redirectPath={nextPath} className="v2-google-btn" />
-      <AuthDivider label="or continue with email" />
       <form onSubmit={handleSubmit} className="space-y-4">
         <AuthInput
           id="email"

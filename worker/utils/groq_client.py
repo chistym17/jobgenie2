@@ -18,7 +18,7 @@ def get_groq_client() -> OpenAI:
 
 def generate_text(
     prompt: str,
-    model: str = "llama-3.1-8b-instant",
+    model: str = os.environ.get("GROQ_MODEL_NAME"),
     max_tokens: int = 512,
     temperature: float = 0.7,
 ) -> str:
