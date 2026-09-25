@@ -9,9 +9,13 @@ load_dotenv()
 from utils.redis_url import normalize_redis_url, resolve_redis_url
 
 _app_env = (os.getenv("APP_ENV") or os.getenv("ENVIRONMENT") or "local").strip().lower()
+_job_runner = (os.getenv("JOB_RUNNER") or "celery").strip().lower()
 _redis_url = resolve_redis_url()
 
-if _app_env in ("prod", "production"):
+if _job_runner == "modal":
+    # Broker unused on Modal; keep Celery app importable for @task wrappers.
+    _result_backend = _redis_url
+elif _app_env in ("prod", "production"):
     _result_backend = _redis_url
     # Celery also reads these from the environment; keep them in sync so SSL
     # settings are not paired with a leftover redis://localhost backend URL.

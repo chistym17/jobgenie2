@@ -250,18 +250,28 @@ def parse_resume_v2(self, upload_id: str, file_id: str, user_email: str):
 
     logger.info("parse_resume_v2 success upload_id=%s resume_id=%s", upload_id, resume_id)
 
-    embed_task = precompute_resume_embedding_task.delay(user_email, upload_id)
+    embed_task_id = None
+    try:
+      from runtime_enqueue import enqueue_precompute_embedding
+
+      embed_task_id = enqueue_precompute_embedding(user_email, upload_id)
+    except Exception as embed_err:
+      # Fallback to Celery if dispatcher fails (keeps local robust)
+      logger.warning("enqueue_precompute_embedding failed (%s); falling back to Celery", embed_err)
+      embed_task = precompute_resume_embedding_task.delay(user_email, upload_id)
+      embed_task_id = embed_task.id
+
     logger.info(
       "Triggered precompute_resume_embedding_task for upload_id=%s task_id=%s user_email=%s",
       upload_id,
-      embed_task.id,
+      embed_task_id,
       user_email,
     )
     uploads.update_one(
       {"_id": ObjectId(upload_id)},
       {
         "$set": {
-          "embedding_task_id": embed_task.id,
+          "embedding_task_id": embed_task_id,
           "status": "embedding",
           "updated_at": datetime.utcnow(),
         }

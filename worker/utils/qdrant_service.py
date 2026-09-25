@@ -71,12 +71,24 @@ def insert_resume_embedding(embedding: list[float], payload: dict):
         return None
 
 def search_similar(text_embedding: list[float], top_k: int = 5):
-    results = client.search(
+    """
+    Dense vector search against job embeddings.
+    Compatible with both older qdrant-client (.search) and newer (.query_points).
+    """
+    if hasattr(client, "query_points"):
+        # qdrant-client >= 1.12-ish: search() removed / moved
+        response = client.query_points(
+            collection_name=COLLECTION_NAME,
+            query=text_embedding,
+            limit=top_k,
+            with_payload=True,
+        )
+        return response.points
+    return client.search(
         collection_name=COLLECTION_NAME,
         query_vector=text_embedding,
-        limit=top_k
+        limit=top_k,
     )
-    return results
 
 def list_collections():
   

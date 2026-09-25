@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, Query
 
-from app.config.v2.celery_client import celery_client
+from app.config.v2.task_dispatcher import enqueue_process_jobs_to_qdrant
 from app.services import jobs
 
 router = APIRouter(prefix="/maintenance", tags=["Job Maintenance"])
@@ -41,12 +41,12 @@ async def trigger_delete_old_jobs(days: int = Query(7, ge=1, le=365)):
 
 @router.api_route("/ingest-qdrant", methods=["GET", "POST"])
 async def trigger_ingest_qdrant():
-    task = celery_client.send_task("process_jobs_to_qdrant")
+    task_id = enqueue_process_jobs_to_qdrant()
     return {
         "status": "queued",
         "job": "ingest_qdrant",
-        "task_id": task.id,
-        "message": "Job ingestion to Qdrant queued (requires Celery worker)",
+        "task_id": task_id,
+        "message": "Job ingestion to Qdrant queued",
     }
 
 

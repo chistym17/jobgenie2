@@ -60,6 +60,12 @@ def signup(user: UserSignup):
     user_dict["authProvider"] = "local"
     users_collection.insert_one(user_dict)
     access_token = create_access_token({"sub": user.email, "name": user.name})
+    try:
+        from app.config.v2.task_dispatcher import enqueue_warmup
+
+        enqueue_warmup()
+    except Exception:
+        pass
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/login", response_model=Token)
@@ -68,6 +74,12 @@ def login(user: UserLogin):
     if not db_user or not verify_password(user.password, db_user["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     access_token = create_access_token({"sub": db_user["email"], "name": db_user.get("name", "")})
+    try:
+        from app.config.v2.task_dispatcher import enqueue_warmup
+
+        enqueue_warmup()
+    except Exception:
+        pass
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/clerk-sync")
