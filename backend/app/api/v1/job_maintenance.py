@@ -8,10 +8,6 @@ from app.services import jobs
 router = APIRouter(prefix="/maintenance", tags=["Job Maintenance"])
 
 
-def _run_fetch_jobs() -> None:
-    jobs.main()
-
-
 def _run_cleanup_qdrant(days: int) -> None:
     from app.services.qdrant_cleanup import cleanup_old_qdrant_embeddings
 
@@ -19,23 +15,28 @@ def _run_cleanup_qdrant(days: int) -> None:
 
 
 @router.api_route("/fetch-jobs", methods=["GET", "POST"])
-async def trigger_fetch_jobs(background_tasks: BackgroundTasks):
-    background_tasks.add_task(_run_fetch_jobs)
+async def trigger_fetch_jobs():
+    summary = jobs.main()
     return {
-        "status": "started",
+        "status": "completed",
         "job": "fetch_jobs",
-        "message": "Fetching jobs from feeds and saving to MongoDB",
+        "fetched": summary["fetched"],
+        "saved": summary["saved"],
+        "wwr": summary["wwr"],
+        "remoteok": summary["remoteok"],
+        "message": f"Fetched {summary['fetched']} jobs (saved {summary['saved']})",
     }
 
 
 @router.api_route("/delete-old-jobs", methods=["GET", "POST"])
 async def trigger_delete_old_jobs(days: int = Query(7, ge=1, le=365)):
-    jobs.delete_jobs_older_than(days)
+    deleted = jobs.delete_jobs_older_than(days)
     return {
         "status": "completed",
         "job": "delete_old_jobs",
         "days": days,
-        "message": f"Deleted jobs older than {days} days from MongoDB",
+        "deleted": deleted,
+        "message": f"Deleted {deleted} jobs older than {days} days from MongoDB",
     }
 
 

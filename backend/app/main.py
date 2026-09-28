@@ -26,6 +26,10 @@ app.include_router(health.router, prefix="/api/v1/health")
 def root():
     return {"message": "Job Assistant API is running"}
 
+@app.get("/health")
+def health_ping():
+    return {"status": "ok", "service": "backend"}
+
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",

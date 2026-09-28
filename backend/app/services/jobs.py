@@ -108,15 +108,15 @@ def deduplicate_jobs(jobs: list) -> list:
             unique_jobs.append(job)
     return unique_jobs
 
-def save_to_mongodb(jobs: list):
+def save_to_mongodb(jobs: list) -> int:
     try:
-
         client = MongoClient(os.getenv("MONGODB_URI"), serverSelectionTimeoutMS=5000)
         db = client["jobs_db"]
         collection = db["jobs"]
         if not jobs:
             print("No jobs to save to MongoDB")
-            return
+            client.close()
+            return 0
         for job in jobs:
             collection.update_one(
                 {"id": job["id"]},
@@ -125,13 +125,16 @@ def save_to_mongodb(jobs: list):
             )
         print(f"Saved {len(jobs)} jobs to MongoDB")
         client.close()
+        return len(jobs)
     except ConfigurationError as e:
         print(f"MongoDB connection failed: {e}")
+        return 0
     except Exception as e:
         print(f"MongoDB save failed: {e}")
+        return 0
 
 
-def delete_jobs_older_than(days: int = 7):
+def delete_jobs_older_than(days: int = 7) -> int:
     try:
         client = MongoClient(os.getenv("MONGODB_URI"), serverSelectionTimeoutMS=5000)
         db = client["jobs_db"]
@@ -145,10 +148,12 @@ def delete_jobs_older_than(days: int = 7):
         })
         print(f"Deleted {result.deleted_count} jobs older than {days} days (before {cutoff_str})")
         client.close()
+        return result.deleted_count
     except Exception as e:
         print(f"MongoDB deletion failed: {e}")
+        return 0
 
-def main():
+def main() -> dict:
     existing_urls = set()
     if os.path.exists('cleaned_jobs.json'):
         with open('cleaned_jobs.json', 'r', encoding='utf-8') as f:
@@ -164,14 +169,19 @@ def main():
 
     unique_jobs.sort(key=lambda x: x['date'], reverse=True)
 
-    save_to_mongodb(unique_jobs)
+    saved = save_to_mongodb(unique_jobs)
 
-    print(f"\nTotal engineering jobs fetched: {len(unique_jobs)}")
-    print(f" - WWR: {len(wwr_jobs)}")
-    print(f" - Remote OK: {len(remoteok_jobs)}")
-    print("\nSample (first 3 jobs or fewer):")
-    for job in unique_jobs[:3]:
-        print(json.dumps(job, indent=2, ensure_ascii=False))
+    summary = {
+        "fetched": len(unique_jobs),
+        "saved": saved,
+        "wwr": len(wwr_jobs),
+        "remoteok": len(remoteok_jobs),
+    }
+    print(
+        f"Total engineering jobs fetched: {summary['fetched']} "
+        f"(WWR={summary['wwr']}, RemoteOK={summary['remoteok']}, saved={summary['saved']})"
+    )
+    return summary
 
 if __name__ == "__main__":
     main()

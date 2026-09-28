@@ -7,8 +7,6 @@ from services.resume_advisor_service import ResumeAdvisorService
 from services.match_coach_service import MatchCoachService
 from db import fetch_resume_data, fetch_resume_data_by_upload_id, get_mongodb_client
 import datetime
-from db import check_mongodb_connection
-from utils.qdrant_service import check_qdrant_connection
 from celery_tasks.recommendation_task import generate_recommendations_task
 from celery_tasks.precompute_embedding import precompute_resume_embedding_task
 from celery.result import AsyncResult
@@ -35,15 +33,7 @@ app.add_middleware(
 
 @app.get("/health")
 async def health_check():
-    mongodb_connection = check_mongodb_connection()
-    qdrant_connection = check_qdrant_connection()
-    return {
-        "status": "healthy",
-        "timestamp": datetime.datetime.now().isoformat(),
-        "service": "JobGenie Worker",
-        "mongodb_connection": mongodb_connection,
-        "qdrant_connection": qdrant_connection
-    }
+    return {"status": "ok", "service": "worker"}
 
 
 
