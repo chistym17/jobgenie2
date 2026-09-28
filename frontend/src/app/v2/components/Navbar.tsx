@@ -69,9 +69,6 @@ const Navbar = () => {
             <Link href="/uploads" className="v2-link transition-colors">
               Dashboard
             </Link>
-            <Link href="/observability" className="v2-link transition-colors">
-              API trace
-            </Link>
           </>
         ) : null}
       </div>
