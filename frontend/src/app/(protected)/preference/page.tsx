@@ -30,7 +30,6 @@ const PreferencesPage: NextPage = () => {
             <Head>
                 <title>Job Preferences | JobGenie</title>
                 <meta name="description" content="Set your job preferences to find your ideal position" />
-                <link rel="icon" href="/favicon.ico" />
             </Head>
 
             <main>

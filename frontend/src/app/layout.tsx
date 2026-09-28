@@ -4,8 +4,12 @@ import ClerkUserSync from "./components/ClerkUserSync";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Job Genie",
-  description: "Job Genie - Find your dream job",
+  title: "JobGenie",
+  description: "Find jobs that match your resume",
+  icons: {
+    icon: [],
+    apple: [],
+  },
 };
 
 export default function RootLayout({

@@ -117,7 +117,6 @@ export default function Home() {
             <Head>
                 <title>JobGenie - Smart Recommendations</title>
                 <meta name="description" content="AI-powered job recommendations" />
-                <link rel="icon" href="/favicon.ico" />
             </Head>
             <Navbar />
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-6 py-8">
