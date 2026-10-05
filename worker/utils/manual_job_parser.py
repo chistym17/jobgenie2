@@ -12,6 +12,10 @@ def _get_markdown(scrape_result: Any) -> str:
         data = scrape_result.get("data")
         if isinstance(data, dict) and isinstance(data.get("markdown"), str):
             return data["markdown"]
+        return ""
+    md = getattr(scrape_result, "markdown", None)
+    if isinstance(md, str):
+        return md
     return ""
 
 
